@@ -1,5 +1,7 @@
 # Plate Recognition (C-04 – C-08)
 
+[한국어](plate_recognition.ko.md)
+
 Crop → `preprocess_plate` (own) → `recognize` (PaddleOCR) → `judge` (own rules).
 
 ## Pipeline (C-07, C-08)
@@ -74,7 +76,7 @@ Otsu binarization breaks thin strokes and loses most reads.
 
 ## Recognition (C-05)
 
-- PaddleOCR `korean` (see `docs/model_selection.md`)
+- PaddleOCR `korean` (see [model_selection.md](model_selection.md))
 - Boxes are joined top-to-bottom, then left-to-right (two-line plates)
 - `O`→`0` and `I`/`l`→`1` (plates have no Latin letters), then only digits and Hangul are kept
 - Confidence is the lowest box score
