@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, median, ycrcb_to_bgr
+from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, median, unsharp, ycrcb_to_bgr
 
 
 def sample_frame():
@@ -197,3 +197,63 @@ def test_median_invalid_size(ksize):
 def test_median_invalid_frame(bad):
     with pytest.raises(ValueError):
         median(bad, 3)
+
+
+@pytest.mark.parametrize("sigma,ksize", [(0.1, 3), (0.5, 5), (1, 7), (2, 9), (100, 9)])
+@pytest.mark.parametrize("amount,threshold", [(0.5, 0), (1.2, 10), (3, 50)])
+def test_unsharp_reference(sigma, ksize, amount, threshold):
+    import cv2
+    img = sample_frame()
+    blur = cv2.GaussianBlur(img, (ksize, ksize), sigma, borderType=cv2.BORDER_REFLECT_101)
+    difference = img.astype(float) - blur.astype(float)
+    difference[np.abs(difference) < threshold] = 0
+    expected = np.clip(np.rint(img + amount * difference), 0, 255).astype(np.uint8)
+    # Fixed-point kernels are checked separately against the Gaussian reference.
+    np.testing.assert_array_equal(unsharp(img, amount, sigma, threshold), expected)
+
+
+@pytest.mark.parametrize("shape", [(1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_unsharp_tiny_frames(shape):
+    img = np.full(shape, 99, np.uint8)
+    np.testing.assert_array_equal(unsharp(img, 2, 1, 0), img)
+
+
+def test_unsharp_zero_amount_and_high_threshold_are_exact():
+    img = sample_frame()[:, ::-2]
+    before = img.copy()
+    for out in (unsharp(img, 0, 1, 0), unsharp(img, 3, 1, 256)):
+        np.testing.assert_array_equal(out, before)
+        assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+    np.testing.assert_array_equal(img, before)
+
+
+def test_unsharp_threshold_equality_is_applied_and_output_clips():
+    # Derive an exact boundary from the green impulse; red/blue force saturation.
+    img = np.full((5, 5, 3), 100, np.uint8)
+    img[2, 2] = [0, 110, 255]
+    before = img.copy()
+    difference = img.astype(float) - gaussian(img, 7, 1).astype(float)
+    threshold = abs(difference[2, 2, 1])
+    out = unsharp(img, 10, 1, threshold)
+    assert out[2, 2, 0] == 0 and out[2, 2, 2] == 255
+    assert out[2, 2, 1] > img[2, 2, 1]
+    unchanged = abs(difference) < threshold
+    np.testing.assert_array_equal(out[unchanged], img[unchanged])
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("name,value", [(name, value) for name in ('amount', 'threshold')
+    for value in (-1, np.nan, np.inf, True, None, '1', 1j)] +
+    [('sigma', value) for value in (0, -1, np.nan, np.inf, True, None, '1', 1j)])
+def test_unsharp_invalid_parameters(name, value):
+    params = dict(amount=1, sigma=1, threshold=0)
+    params[name] = value
+    with pytest.raises(ValueError):
+        unsharp(sample_frame(), **params)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_unsharp_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        unsharp(bad, 1, 1, 0)
