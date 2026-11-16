@@ -1,6 +1,35 @@
-# Plate Recognition (C-04, C-05, C-06)
+# Plate Recognition (C-04 – C-08)
 
 Crop → `preprocess_plate` (own) → `recognize` (PaddleOCR) → `judge` (own rules).
+
+## Pipeline (C-07, C-08)
+
+`detect_plates(frame, cond=None, frame_id=None)` gives one result per vehicle:
+
+1. `detect_vehicles` (YOLOv8n), largest first
+2. `detect_plate_candidates` for that vehicle (top 3)
+3. Each candidate with a 10% border: preprocess → OCR → judge, in order, stopping at the first readable one
+4. Keep the best read (status, then conf) and save its crop to `results/ocr/crops/<cond>/<frame_id>_<n>.png`
+
+`cond` and `frame_id` are optional so `detect_plates(frame)` still works (crops then go to `crops/misc/` under a hash of the frame).
+Plate crops show real plates and are ignored by git.
+
+`python -m src.plate.run <cond>` reads `data/frames/<cond>/*.png` and writes `results/ocr/<cond>.csv`:
+
+| Column | Meaning |
+| --- | --- |
+| `frame` | frame file name, e.g. `fog_01_3500.png` |
+| `plate` | plate index in the frame (empty if no plate) |
+| `x`, `y`, `w`, `h` | plate box |
+| `crop_path` | relative to the project root |
+| `text` | empty when unreadable, may contain `?` when uncertain |
+| `conf` | OCR confidence |
+| `status` | `readable`, `uncertain`, `unreadable`, or empty if no plate |
+| `ocr_ms` | time for the whole frame |
+
+A frame with no plate still gets one row, so the CSVs of all conditions list the same frames.
+
+On the 10 real photos: the labeled plate was readable and exact in 7/10, the other 3 were uncertain, and no wrong read was readable. About 1.6 s per frame on CPU.
 
 ## Preprocessing (C-04)
 
@@ -63,6 +92,10 @@ Plate format: `^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$` (optional region name, e.
 
 One fix means, in order: replace one character with `?`, insert one `?`, or drop one character.
 If more than one place could be wrong, the result is unreadable. No character is ever filled in.
+
+Limit: when OCR drops the Hangul or reads it as two digits, the `?` can land one position off
+(e.g. `123가4567` read as `1234567` becomes `12?4567`). This happened in 2 of the 3 uncertain photos.
+These stay uncertain, never readable.
 
 | OCR text | conf | Status | Text |
 | --- | --- | --- | --- |
