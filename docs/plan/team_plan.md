@@ -59,6 +59,7 @@ detect_plates(frame, cond=None, frame_id=None) -> [{"bbox": (x, y, w, h), "crop_
                                                     "conf": float, "status": "readable" | "uncertain" | "unreadable"}]
 eval_ocr(results, labels) -> dict        # called by B's sensitivity script
 aggregate(results_dir) -> results/summary.csv
+compare(results_dir, labels) -> (table, cases)  # compare.csv, worse_cases.csv
 # Member D · src/common/, src/pipeline/, src/vlm/
 run_experiment(condition="orig" | "fixed" | "adaptive", steps) -> results/
 summarize_scene(frames) -> dict          # fixed JSON schema, no OCR results in the prompt
@@ -66,6 +67,8 @@ score_vlm(verify_sheet, labels) -> summary
 ```
 
 > **Proposed change (confirm 11/17):** `detect_plates(frame)` alone cannot build `crop_path`, so `cond` and `frame_id` were added as optional arguments. `detect_plates(frame)` still works; crops then go to `results/ocr/crops/misc/`.
+
+> **Proposed change (confirm 11/17):** `compare(summary)` became `compare(results_dir, labels)`: frame counts need the OCR CSVs and labels, not only `summary.csv`. Metric changes still come from `summary.csv`.
 
 **2. Folders.** All modules read and write PNGs under `data/frames/` instead of videos. File names are the same `<clip>_<ms>.png` in all three condition folders; this is how we guarantee the same frames in every condition.
 
@@ -84,6 +87,8 @@ Added since the first version:
 ```text
 results/ocr/<cond>.csv             plate results per condition (C-08)
 results/ocr/ocr_summary.csv        OCR metrics per condition (C-09)
+results/compare.csv                better and worse frames per pair (C-11)
+results/worse_cases.csv            plates that got worse, with both crops (C-11)
 results/ocr/crops/<cond>/          plate crops, ignored by git (real plates)
 weights/                           model weights, ignored by git, downloaded on first run
 docs/ tools/ tests/                notes, helper scripts, pytest tests
@@ -102,7 +107,7 @@ requirements-<module>.txt          per-module dependencies until D merges requir
 | `detect_plates`, OCR results | C → D, B | 11/16 | Fake result JSON | `detect_plates` merged (#14); OCR CSV runs once frames exist |
 | VLM response cache | D → B | 11/17 | Fake result JSON | — |
 | Adaptive frames | B → C, D | 11/18 | Fixed frames | — |
-| VLM scores, `timing.csv` | D → C | 11/21 | Fake result CSV | — |
+| VLM scores, `timing.csv` | D → C | 11/21 | Fake result CSV | — (C built with fake CSVs; `score.csv` format proposed in [docs/aggregation.md](../aggregation.md)) |
 
 ## WBS
 
@@ -143,7 +148,7 @@ Development only, starting 11/7. Original frames are shared on 11/8, fixed frame
 | 3.6 | `detect_plates`, original frame results | C | 11/16 | `results/ocr/orig.csv` | 3.5 | Code done (#14), CSV waits for frames |
 | 3.7 | OCR evaluation (detection, exact match, char accuracy) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | Done (#16) |
 | 3.8 | Run on fixed and adaptive frames | C | 11/19–11/20 | `fixed.csv`, `adaptive.csv` | 3.7, 1.9, 2.7 | Waits for frames |
-| 3.9 | Aggregation (OCR, VLM, time), comparison, better/worse counts | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | To do |
+| 3.9 | Aggregation (OCR, VLM, time), comparison, better/worse counts | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | Code done (#24, #26); final run after 11/22 |
 | **4** | **Experiment runner + VLM + environment** | **D** | **11/7–11/28** |  |  |  |
 | 4.1 | Common utils (frame load/save, logger, timer), `main.py` skeleton | D | 11/7–11/8 | `src/common/`, `main.py` | – | — |
 | 4.2 | `run_experiment` (frame list check, config snapshot) | D | 11/8–11/11 | `pipeline/run.py` | 4.1 | — |
@@ -197,7 +202,7 @@ gantt
     detect_plates 3.6              :milestone, done, c3, 2026-11-16, 0d
     OCR eval 3.7                   :done, c4, 2026-11-16, 2026-11-20
     Fixed, adaptive runs 3.8       :c5, 2026-11-19, 2026-11-21
-    Aggregate, compare 3.9         :c6, 2026-11-20, 2026-11-25
+    Aggregate, compare 3.9         :active, c6, 2026-11-20, 2026-11-25
     section D · runner, VLM, env
     Utils, runner, timing 4.1–4.3  :d1, 2026-11-07, 2026-11-13
     VLM, cache 4.4–4.5             :d2, 2026-11-12, 2026-11-18
@@ -233,6 +238,9 @@ The integration checks are on 11/10, 11/17 and 11/24. Each one joins what exists
 | 3 | `eval_set.csv` condition value for snow clips (only `low_light/rain/fog` today) | B | Add `snow` or merge into `fog` |
 | 4 | `data/clips/`, `data/frames/` in git? (file size, real plates) | All | Keep out of git, share by drive |
 | 5 | Merge `requirements-*.txt` into `requirements.txt` | D | Pins in the risks table below; ultralytics brings `opencv-python` 5.x, PaddleOCR brings `opencv-contrib-python` 4.10 |
+| 6 | `compare(results_dir, labels)` instead of `compare(summary)` | C | Keep; frame counts need the OCR CSVs and labels |
+| 7 | `vlm/score.csv` columns | D, C | Counts per condition and clip as in [docs/aggregation.md](../aggregation.md); C pools them per condition |
+| 8 | Result CSVs with plate text (`results/ocr/<cond>.csv`, `worse_cases.csv`) in git? | All | Keep real plate text out of git like the crops; commit `summary.csv` and `compare.csv` only |
 
 ## Risks and responses
 
@@ -245,7 +253,7 @@ The biggest risk is A's ops being late, so B and C wait for enhanced frames. So 
 | Pretrained detector or OCR cannot read Korean plates | C | Check with 10 sample photos at selection. If not, manual plate boxes and automate OCR only | 11/8 | Resolved: PaddleOCR 7/10 on real photos; own plate candidate search instead of a plate detector |
 | Adaptive rules worse than fixed | B | Report as is, explain with the sensitivity test (2.10) | 11/22 | — |
 | VLM cost, speed, unstable output format | D | Fix prompt and schema on 11/15, no changes after. Cache every response and score without reruns | 11/15 | — |
-| Package or aggregation waits for other results | B, C | Build the structure with fake result files, then swap paths. Rerun VLM final scores on the real sheet right after fact checking ends on 11/22 | 11/17 | C: eval done early (#16); aggregation next with fake CSVs |
+| Package or aggregation waits for other results | B, C | Build the structure with fake result files, then swap paths. Rerun VLM final scores on the real sheet right after fact checking ends on 11/22 | 11/17 | C: eval, aggregation and comparison done with fake files (#16, #24, #26); swap in real results when they arrive |
 | cv2 processing functions or stubs left in submitted code | A, all | Run the 1.12 check script at Integration Check 3 and on 11/25 | 11/25 | `src/plate`, `src/eval`: only `imdecode`/`imencode` |
 | Interface changes break integration | All | No changes. If unavoidable, announce in the group chat and apply only on an integration check day | Always | `detect_plates` optional args, see open items |
 | Label schema late | All | Develop scoring with fake labels, rerun numbers when labels arrive | 11/16 | Added: no schema in the repo yet |

@@ -10,10 +10,10 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 
 | | |
 | --- | --- |
-| **머지 완료** | C-01\~C-09: #2, #4, #8, #10, #12, #14, #16 |
-| **바로 넘길 수 있음** | `detect_plates`(D), 프레임이 오면 `run_ocr`로 `orig.csv` 생성(B, D), `eval_ocr`(B) |
+| **머지 완료** | C-01\~C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26 |
+| **바로 넘길 수 있음** | `detect_plates`(D), 프레임이 오면 `run_ocr`로 `orig.csv` 생성(B, D), `eval_ocr`(B), 결과가 모이면 `summary.csv`와 `compare.csv`(전원) |
 | **기다리는 것** | 원본 프레임과 라벨 스키마(B), 고정 보정 프레임(A), 적응형 보정 프레임(B), VLM 점수와 `timing.csv`(D) |
-| **다음 할 일** | 가짜 CSV로 C-10, C-11. 스키마가 오면 라벨링 |
+| **다음 할 일** | 스키마가 오면 라벨링. 실제 프레임이 오면 OCR → 평가 → 집계 → 비교 실행 |
 
 ## 날짜별 할 일
 
@@ -43,7 +43,8 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 - [x] 11/17–11/19 OCR 평가 `eval_ocr` (C-09). B의 민감도 스크립트가 부를 수 있는 함수로 (#16)
 - [ ] 11/19–11/20 고정·적응형 프레임 실행, `fixed.csv`, `adaptive.csv` (C-08)
 - [ ] 11/20–11/22 D의 클립 VLM 사실 검증 (ALL-04)
-- [ ] 11/20–11/24 전체 집계 `aggregate`, 조건 간 비교표 `compare` (C-10, C-11). VLM 최종 점수는 11/22 이후 다시 실행
+- [x] 가짜 CSV로 전체 집계 `aggregate`, 조건 간 비교표 `compare` 완성 (C-10, C-11, #24, #26)
+- [ ] 11/22–11/24 VLM 최종 점수가 나온 뒤 실제 결과로 집계와 비교 다시 실행
 - [ ] 11/24 통합 점검 3: 세 조건 결과 확정
 
 **마지막 주 (11/25–11/28)**
@@ -60,11 +61,11 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 | 받음 | 확정된 정답 라벨 `data/labels/` | 전원 | 11/16 | D의 가짜 라벨(`tests/fixtures/`) | 저장소에 없음. 테스트는 자체 가짜 라벨 사용 |
 | 받음 | 고정 보정 프레임 `frames/fixed/` | A | 11/15 | 원본 프레임 | 저장소에 없음 |
 | 받음 | 적응형 보정 프레임 `frames/adaptive/` | B | 11/18 | 고정 보정 프레임 | 11/18 예정 |
-| 받음 | VLM 점수 `results/vlm/score.csv`, `timing.csv` | D | 11/21 (최종값 11/22 이후) | 가짜 CSV | 11/21 예정 |
+| 받음 | VLM 점수 `results/vlm/score.csv`, `timing.csv` | D | 11/21 (최종값 11/22 이후) | 가짜 CSV | 11/21 예정. 형식은 [docs/aggregation.ko.md](../aggregation.ko.md)에 제안 |
 | 줌 | `detect_plates` 함수 | D(실행기) | 11/16 | 빈 리스트를 돌려주는 껍데기(11/8) | 머지 완료(#14) |
 | 줌 | OCR 결과와 크롭 `results/ocr/` | B(패키지), D | 11/16 | – | 프레임이 오면 `python -m src.plate.run orig` |
 | 줌 | `eval_ocr` 함수 | B(민감도 실험) | 11/19 | – | 머지 완료(#16) |
-| 줌 | `summary.csv`, 조건 간 비교표, 악화 사례 목록 | 전원(보고서·발표) | 11/24 | – | 예정 |
+| 줌 | `summary.csv`, 조건 간 비교표, 악화 사례 목록 | 전원(보고서·발표) | 11/24 | – | 코드 머지 완료(#24, #26). 수치는 실제 결과가 오면 |
 | 줌 | README용 "사전학습 vs 직접 구현" 표 | D | 11/25 | – | 아래에 준비됨 |
 
 `detect_plates`는 항상 `{"bbox", "crop_path", "text", "conf", "status"}` 딕셔너리의 리스트를 돌려주고, 번호판이 없으면 빈 리스트를 돌려줍니다. `cond`, `frame_id`는 선택 인자로 추가했습니다(11/17 확정).
@@ -77,7 +78,9 @@ python -m pytest tests/
 python tools/model_check.py <samples>          # C-01: 샘플로 검출기·OCR 비교
 python tools/preprocess_check.py <samples>     # C-04: 전처리 유무별 OCR 비교
 python -m src.plate.run orig                   # C-08: data/frames/orig → results/ocr/orig.csv
-python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv (#16)
+python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
+python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
+python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (라벨: data/labels)
 ```
 
 `<samples>` 폴더에는 `full/`, `crops/`, `labels.csv`(`file,text`)가 있습니다. 샘플 사진은 저장소 밖에 둡니다.
@@ -125,11 +128,17 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - `frame_char_accuracy`는 C-11에서 쓸 프레임별 점수입니다.
 - 손으로 계산한 3건이 `tests/test_ocr_eval.py`에 있습니다.
 
-### C-10, C-11 집계와 비교 (예정)
+### C-10 집계 — `src/eval/aggregate.py`, [docs/aggregation.ko.md](../aggregation.ko.md)
 
-- `summary.csv`는 조건마다 한 행: 검출률, 완전일치율, 문자 정확도, 과신 건수, VLM 장면 정확도, 환각률, 단계별 평균 시간. 열 이름은 `src/eval/aggregate.py`에 정해 두었습니다.
-- 비교는 `orig` 대 `fixed`, `fixed` 대 `adaptive` 두 쌍입니다. 프레임마다 문자 정확도가 오르면 개선, 내리면 악화, 같으면 변화 없음으로 세고, 세 수의 합이 전체 프레임 수와 같은지 확인합니다.
-- 악화 사례는 크롭 경로와 함께 목록으로 남깁니다. 계획서가 "보정이 항상 좋다고 가정하지 않는다"고 약속했기 때문에, 발표에서 가장 설득력 있는 자료가 됩니다.
+- `summary.csv`는 조건마다 한 행: 번호판 수, 검출률, 완전일치율, 문자 정확도, 과신 건수, `readable_wrong`, VLM 장면 정확도, 환각률, 확인 불가 주장 수, 단계별 프레임당 평균 ms.
+- `score.csv`에 개수 열이 있으면 클립을 합쳐 계산하고, 없으면 행별 비율을 평균합니다. 파일이 없으면 해당 열만 비워 두므로 결과가 다 모이기 전에도 돌아갑니다.
+- 손으로 계산한 경우가 `tests/test_aggregate.py`에 있습니다.
+
+### C-11 비교 — `src/eval/compare.py`, [docs/comparison.ko.md](../comparison.ko.md)
+
+- `orig` → `fixed`, `fixed` → `adaptive` 두 쌍입니다. 프레임의 평균 문자 정확도가 오르면 개선, 내리면 악화, 같으면 변화 없음입니다. 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 세므로, 세 수의 합은 비교한 프레임 수와 같습니다.
+- `compare.csv`에는 `summary.csv`에서 계산한 지표 변화량도 들어갑니다. `worse_cases.csv`는 나빠진 번호판마다 두 조건의 크롭 경로를 적고, 많이 떨어진 순서로 정렬합니다. 계획서가 "보정이 항상 좋다고 가정하지 않는다"고 약속했기 때문에, 발표에서 가장 설득력 있는 자료가 됩니다.
+- 손으로 계산한 경우가 `tests/test_compare.py`에 있습니다.
 
 ## 사전학습 vs 직접 구현 (README용)
 
@@ -150,6 +159,9 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - 라벨 스키마: 번호판 부분을 [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)의 형식으로 맞추거나 `load_labels`만 수정합니다.
 - 눈 클립에 쓸 `eval_set.csv`의 condition 값.
 - `data/clips/`, `data/frames/`는 git에서 제외.
+- `compare(summary)` 대신 `compare(results_dir, labels)`: 프레임별 개수에는 OCR CSV와 라벨이 필요합니다.
+- D와 `vlm/score.csv`의 열 확정: 조건·클립별 개수([docs/aggregation.ko.md](../aggregation.ko.md)).
+- 번호판 글자가 든 결과 CSV(`results/ocr/<cond>.csv`, `worse_cases.csv`): 실제 결과는 git에서 제외.
 - 원본 프레임이 오면 바로 `python -m src.plate.run orig` 실행.
 
 ## 리스크와 결과
@@ -160,7 +172,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 | 번호판 검출 모델이 한국 번호판을 못 잡음 | 11/10–11/12, C-03 | 차량 박스 안 엣지·비율 기반 후보 탐색 직접 구현, 안 되면 라벨 bbox + OCR만 자동화 | 직접 구현 사용: 10/10장에서 상위 3개 안 |
 | 블랙박스 프레임의 번호판이 너무 작음 | 11/16, 원본 결과 | 번호판이 크게 보이는 타임스탬프를 더 고르고 B에게 추가 요청 | 프레임이 와야 알 수 있음 |
 | 모델 설치·GPU 문제 | 11/8 | CPU용 작은 모델(n 사이즈)로 고정 | CPU로 충분. PC 한 대에서 `pandas==2.2.3`, `chardet==5.2.0` 고정(Windows 응용 프로그램 제어), `enable_mkldnn=False`(PaddlePaddle 3.3 CPU), 백신 HTTPS 검사로 OS 인증서 저장소 필요 |
-| 라벨이 늦게 확정됨 | 11/16 | 가짜 라벨로 `eval_ocr`을 먼저 완성하고 숫자만 다시 뽑음 | 발생 중: 저장소에 스키마 없음. 가짜 라벨로 평가 완성(#16) |
+| 라벨이 늦게 확정됨 | 11/16 | 가짜 라벨로 `eval_ocr`을 먼저 완성하고 숫자만 다시 뽑음 | 발생 중: 저장소에 스키마 없음. 가짜 파일로 평가·집계·비교 완성(#16, #24, #26) |
 
 ## 제출 전 최종 점검
 
@@ -171,8 +183,8 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - [ ] `orig.csv`, `fixed.csv`, `adaptive.csv`의 프레임 목록이 완전히 같음 — 프레임 필요
 - [x] 모든 결과 행에 `bbox`, `crop_path`, `text`, `conf`, `status`가 있고, `unreadable`이면 `text`가 `None` (테스트)
 - [x] `eval_ocr`이 손으로 계산한 3건과 같은 값을 냄 (#16)
-- [ ] 비교표에서 개선 + 악화 + 변화 없음 = 전체 프레임 수 — C-11
+- [x] 비교표에서 개선 + 악화 + 변화 없음 = 비교한 프레임 수 (#26, 테스트)
 - [x] 검출기·OCR의 모델명, 버전, 가중치 출처, 라이선스가 선정 메모에 있음
 - [ ] D에게 README용 표 전달 — 위에 표 준비됨
 - [ ] 모델 가중치가 자동으로 받아지거나 받는 방법이 README에 있음 — 코드에서는 자동, README는 D 담당
-- [ ] 발표용 자료로 쓸 개선 사례 3건, 악화 사례 3건의 크롭 이미지 — C-11 이후
+- [ ] 발표용 자료로 쓸 개선 사례 3건, 악화 사례 3건의 크롭 이미지 — 실제 결과가 오면 악화 사례는 `worse_cases.csv`에서, 개선 사례는 직접 고름

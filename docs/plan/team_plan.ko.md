@@ -59,6 +59,7 @@ detect_plates(frame, cond=None, frame_id=None) -> [{"bbox": (x, y, w, h), "crop_
                                                     "conf": float, "status": "readable" | "uncertain" | "unreadable"}]
 eval_ocr(results, labels) -> dict        # B의 민감도 스크립트가 호출
 aggregate(results_dir) -> results/summary.csv
+compare(results_dir, labels) -> (table, cases)  # compare.csv, worse_cases.csv
 # 팀원 D · src/common/, src/pipeline/, src/vlm/
 run_experiment(condition="orig" | "fixed" | "adaptive", steps) -> results/
 summarize_scene(frames) -> dict          # 고정 JSON 스키마, OCR 결과는 프롬프트에 넣지 않음
@@ -66,6 +67,8 @@ score_vlm(verify_sheet, labels) -> summary
 ```
 
 > **변경 제안 (11/17 확정):** `detect_plates(frame)`만으로는 `crop_path`를 만들 수 없어 `cond`, `frame_id`를 선택 인자로 추가했습니다. `detect_plates(frame)` 호출도 그대로 동작하고, 이때 크롭은 `results/ocr/crops/misc/`에 저장됩니다.
+
+> **변경 제안 (11/17 확정):** `compare(summary)`를 `compare(results_dir, labels)`로 바꿨습니다. 프레임별 개수를 세려면 `summary.csv`만으로는 부족하고 OCR CSV와 라벨이 필요하기 때문입니다. 지표 변화량은 그대로 `summary.csv`에서 계산합니다.
 
 **2. 폴더 구조.** 모든 모듈은 영상 대신 `data/frames/` 아래 PNG를 읽고 씁니다. 파일명은 세 조건 폴더에서 동일하게 `<clip>_<ms>.png`로 맞추고, 이것이 세 조건 동일 프레임 보장의 근거가 됩니다.
 
@@ -84,6 +87,8 @@ package/<clip>/                    리뷰 패키지 출력
 ```text
 results/ocr/<cond>.csv             조건별 번호판 결과 (C-08)
 results/ocr/ocr_summary.csv        조건별 OCR 지표 (C-09)
+results/compare.csv                비교 쌍별 개선·악화 프레임 수 (C-11)
+results/worse_cases.csv            나빠진 번호판과 두 조건의 크롭 (C-11)
 results/ocr/crops/<cond>/          번호판 크롭, git 제외 (실제 번호판)
 weights/                           모델 가중치, git 제외, 처음 실행할 때 자동 다운로드
 docs/ tools/ tests/                문서, 보조 스크립트, pytest 테스트
@@ -102,7 +107,7 @@ requirements-<모듈>.txt            D가 requirements.txt로 합치기 전까�
 | `detect_plates`, OCR 결과 | C → D·B | 11/16 | 가짜 결과 JSON | `detect_plates` 머지(#14), OCR CSV는 프레임이 오면 바로 생성 |
 | VLM 응답 캐시 | D → B | 11/17 | 가짜 결과 JSON | — |
 | 적응형 보정 프레임 | B → C·D | 11/18 | 고정 보정 프레임 | — |
-| VLM 채점 결과, `timing.csv` | D → C | 11/21 | 가짜 결과 CSV | — |
+| VLM 채점 결과, `timing.csv` | D → C | 11/21 | 가짜 결과 CSV | — (C는 가짜 CSV로 개발. `score.csv` 형식은 [docs/aggregation.ko.md](../aggregation.ko.md)에 제안) |
 
 ## WBS
 
@@ -143,7 +148,7 @@ requirements-<모듈>.txt            D가 requirements.txt로 합치기 전까�
 | 3.6 | `detect_plates` 통합, 원본 프레임 결과 | C | 11/16 | `results/ocr/orig.csv` | 3.5 | 코드 완료(#14), CSV는 프레임 대기 |
 | 3.7 | OCR 평가(검출률, 완전일치율, 문자 정확도) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | 완료(#16) |
 | 3.8 | 고정·적응형 프레임 적용 | C | 11/19–11/20 | `fixed.csv`, `adaptive.csv` | 3.7, 1.9, 2.7 | 프레임 대기 |
-| 3.9 | 전체 집계(OCR·VLM·시간)와 조건 간 비교표, 개선·악화 건수 | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | 예정 |
+| 3.9 | 전체 집계(OCR·VLM·시간)와 조건 간 비교표, 개선·악화 건수 | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | 코드 완료(#24, #26), 최종 실행은 11/22 이후 |
 | **4** | **실험 실행기 + VLM + 실행 환경** | **D** | **11/7–11/28** |  |  |  |
 | 4.1 | 공용 유틸(프레임 로드/저장, 로거, 타이머), `main.py` 골격 | D | 11/7–11/8 | `src/common/`, `main.py` | – | — |
 | 4.2 | `run_experiment`(프레임 목록 일치 검사, 설정 스냅샷) | D | 11/8–11/11 | `pipeline/run.py` | 4.1 | — |
@@ -197,7 +202,7 @@ gantt
     detect_plates 3.6               :milestone, done, c3, 2026-11-16, 0d
     OCR 평가 3.7                    :done, c4, 2026-11-16, 2026-11-20
     고정·적응형 적용 3.8            :c5, 2026-11-19, 2026-11-21
-    집계·비교 3.9                   :c6, 2026-11-20, 2026-11-25
+    집계·비교 3.9                   :active, c6, 2026-11-20, 2026-11-25
     section D · 실행기·VLM·환경
     유틸·실행기·시간 4.1–4.3        :d1, 2026-11-07, 2026-11-13
     VLM·캐시 4.4–4.5                :d2, 2026-11-12, 2026-11-18
@@ -233,6 +238,9 @@ gantt
 | 3 | 눈 클립에 쓸 `eval_set.csv`의 condition 값(현재 `low_light/rain/fog`뿐) | B | `snow` 추가 또는 `fog`로 묶기 |
 | 4 | `data/clips/`, `data/frames/`를 git에 올릴지(용량, 실제 번호판) | 전원 | git에서 제외하고 드라이브로 공유 |
 | 5 | `requirements-*.txt`를 `requirements.txt`로 합치기 | D | 고정 버전은 아래 리스크 표 참고. ultralytics가 `opencv-python` 5.x를, PaddleOCR이 `opencv-contrib-python` 4.10을 설치해 충돌 |
+| 6 | `compare(summary)` 대신 `compare(results_dir, labels)` | C | 유지. 프레임별 개수에는 OCR CSV와 라벨이 필요 |
+| 7 | `vlm/score.csv`의 열 | D, C | [docs/aggregation.ko.md](../aggregation.ko.md)처럼 조건·클립별 개수. C가 조건별로 합산 |
+| 8 | 번호판 글자가 든 결과 CSV(`results/ocr/<cond>.csv`, `worse_cases.csv`)를 git에 올릴지 | 전원 | 크롭처럼 실제 번호판 글자는 git에서 제외하고 `summary.csv`, `compare.csv`만 커밋 |
 
 ## 리스크와 대응
 
@@ -245,7 +253,7 @@ gantt
 | 사전학습 검출기·OCR이 한국 번호판을 못 읽음 | C | 11/8 선정 단계에서 샘플 10장으로 먼저 확인. 안 되면 번호판 영역 수동 bbox + OCR만 자동화로 범위 축소 | 11/8 | 해소: 실제 사진에서 PaddleOCR 7/10, 번호판 검출기 대신 후보 탐색을 직접 구현 |
 | 적응형 규칙이 고정 보정보다 못함 | B | 결과를 그대로 보고하고, 민감도 실험(2.10)으로 원인 설명 | 11/22 | — |
 | VLM 비용·속도·응답 형식 불안정 | D | 프롬프트와 스키마를 11/15에 고정하고 이후 변경 금지. 응답은 전부 캐시해 재실행 없이 채점 | 11/15 | — |
-| 패키지·집계가 다른 결과를 기다림 | B, C | 가짜 결과 파일로 구조를 먼저 만들고, 실제 결과가 오면 경로만 교체. VLM 최종 점수는 사실 검증이 끝나는 11/22 직후 실제 시트로 다시 실행 | 11/17 | C: 평가 먼저 완료(#16), 다음은 가짜 CSV로 집계 |
+| 패키지·집계가 다른 결과를 기다림 | B, C | 가짜 결과 파일로 구조를 먼저 만들고, 실제 결과가 오면 경로만 교체. VLM 최종 점수는 사실 검증이 끝나는 11/22 직후 실제 시트로 다시 실행 | 11/17 | C: 평가·집계·비교를 가짜 파일로 완료(#16, #24, #26), 실제 결과가 오면 교체 |
 | 제출 코드에 cv2 연산 함수·stub 잔존 | A, 전원 | 1.12 점검 스크립트를 통합 점검 3과 11/25에 실행 | 11/25 | `src/plate`, `src/eval`: `imdecode`/`imencode`만 사용 |
 | 인터페이스 변경으로 통합 실패 | 전원 | 변경 금지. 꼭 바꿔야 하면 카톡 공지 후 통합 점검 날에만 반영 | 상시 | `detect_plates` 선택 인자, 안건 참고 |
 | 라벨 스키마 지연 | 전원 | 가짜 라벨로 채점을 먼저 만들고, 라벨이 오면 숫자만 다시 뽑음 | 11/16 | 추가: 저장소에 아직 스키마 없음 |
