@@ -35,7 +35,7 @@ Digital Image Processing Team Project 02 · Team 16 Black Box · 초판 2026-11-
 - **교차 검수:** 의견이 다른 항목은 11/17 통합 점검 2에서 확정합니다.
 - **VLM 사실 검증:** D가 11/18에 만드는 검증 시트를 씁니다. 시트에는 조건 이름이 가려져 있고, 주장마다 맞음 / 근거 없음 / 확인 불가 중 하나를 고릅니다.
 
-> **11/16 상태:** 라벨 스키마, `eval_set.csv`, 프레임이 아직 저장소에 없습니다. C가 `docs/ocr_evaluation.md`(PR #16)에 최소한의 번호판 라벨 형식을 제안해 두었습니다.
+> **11/16 상태:** 라벨 스키마, `eval_set.csv`, 프레임이 아직 저장소에 없습니다. C가 [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)(#16)에 최소한의 번호판 라벨 형식을 제안해 두었습니다.
 
 ## 공통 규칙
 
@@ -141,7 +141,7 @@ requirements-<모듈>.txt            D가 requirements.txt로 합치기 전까�
 | 3.4 | 크롭 전처리 직접 구현(그레이, 리사이즈, 대비, Otsu, 기울기) | C | 11/12–11/14 | `preprocess.py` | 3.3 | 완료(#12) |
 | 3.5 | OCR 연결, 상태 판정 규칙 | C | 11/14–11/16 | `recognize`, `judge` | 3.4 | 완료(#12) |
 | 3.6 | `detect_plates` 통합, 원본 프레임 결과 | C | 11/16 | `results/ocr/orig.csv` | 3.5 | 코드 완료(#14), CSV는 프레임 대기 |
-| 3.7 | OCR 평가(검출률, 완전일치율, 문자 정확도) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | 리뷰 중(#16) |
+| 3.7 | OCR 평가(검출률, 완전일치율, 문자 정확도) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | 완료(#16) |
 | 3.8 | 고정·적응형 프레임 적용 | C | 11/19–11/20 | `fixed.csv`, `adaptive.csv` | 3.7, 1.9, 2.7 | 프레임 대기 |
 | 3.9 | 전체 집계(OCR·VLM·시간)와 조건 간 비교표, 개선·악화 건수 | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | 예정 |
 | **4** | **실험 실행기 + VLM + 실행 환경** | **D** | **11/7–11/28** |  |  |  |
@@ -195,7 +195,7 @@ gantt
     모델 선정 3.1                   :done, c1, 2026-11-07, 2026-11-09
     검출·전처리·OCR 3.2–3.5         :done, c2, 2026-11-09, 2026-11-17
     detect_plates 3.6               :milestone, done, c3, 2026-11-16, 0d
-    OCR 평가 3.7                    :active, c4, 2026-11-16, 2026-11-20
+    OCR 평가 3.7                    :done, c4, 2026-11-16, 2026-11-20
     고정·적응형 적용 3.8            :c5, 2026-11-19, 2026-11-21
     집계·비교 3.9                   :c6, 2026-11-20, 2026-11-25
     section D · 실행기·VLM·환경
@@ -229,7 +229,7 @@ gantt
 | # | 안건 | 담당 | 제안 |
 | --- | --- | --- | --- |
 | 1 | `detect_plates`의 선택 인자 `cond`, `frame_id` | C | 유지. 기존 호출도 그대로 동작 |
-| 2 | 라벨 스키마와 그중 번호판 부분 | B, C | `docs/ocr_evaluation.md`의 번호판 형식을 쓰거나 B의 스키마를 그 형식으로 변환 |
+| 2 | 라벨 스키마와 그중 번호판 부분 | B, C | [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)의 번호판 형식을 쓰거나 B의 스키마를 그 형식으로 변환 |
 | 3 | 눈 클립에 쓸 `eval_set.csv`의 condition 값(현재 `low_light/rain/fog`뿐) | B | `snow` 추가 또는 `fog`로 묶기 |
 | 4 | `data/clips/`, `data/frames/`를 git에 올릴지(용량, 실제 번호판) | 전원 | git에서 제외하고 드라이브로 공유 |
 | 5 | `requirements-*.txt`를 `requirements.txt`로 합치기 | D | 고정 버전은 아래 리스크 표 참고. ultralytics가 `opencv-python` 5.x를, PaddleOCR이 `opencv-contrib-python` 4.10을 설치해 충돌 |

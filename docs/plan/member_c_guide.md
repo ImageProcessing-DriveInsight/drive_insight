@@ -10,8 +10,7 @@ C finds and reads vehicles and plates (`src/plate/`) and combines the three cond
 
 | | |
 | --- | --- |
-| **Merged** | C-01 to C-08: #2, #4, #8, #10, #12, #14 |
-| **In review** | C-09 OCR evaluation: #16 |
+| **Merged** | C-01 to C-09: #2, #4, #8, #10, #12, #14, #16 |
 | **Ready to hand over** | `detect_plates` (D), `run_ocr` → `orig.csv` as soon as frames exist (B, D), `eval_ocr` (B) |
 | **Waiting for** | Original frames and label schema (B), fixed frames (A), adaptive frames (B), VLM scores and `timing.csv` (D) |
 | **Next** | C-10, C-11 with fake CSVs; labeling once the schema arrives |
@@ -41,7 +40,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 **Week 2 (11/17–11/24): evaluation and aggregation**
 
 - [ ] 11/17 Integration Check 2: OCR on fixed frames, settle label disagreements (agenda below)
-- [x] 11/17–11/19 OCR evaluation `eval_ocr`, callable from B's sensitivity script (C-09, #16 in review)
+- [x] 11/17–11/19 OCR evaluation `eval_ocr`, callable from B's sensitivity script (C-09, #16)
 - [ ] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08)
 - [ ] 11/20–11/22 VLM fact check of D's clips (ALL-04)
 - [ ] 11/20–11/24 Aggregation `aggregate`, comparison `compare` (C-10, C-11); rerun VLM final scores after 11/22
@@ -57,14 +56,14 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 | | What | Who | Due | Stand-in until then | Status 11/16 |
 | --- | --- | --- | --- | --- | --- |
 | Receive | Original frames `frames/orig/` | B | 11/8 | Plate photos from the web, a few frames from own clips | Not in repo; developed on 10 web photos |
-| Receive | Label schema and 3 examples | B | 11/8 | – | Not in repo; plate format proposed (`docs/ocr_evaluation.md`, #16) |
+| Receive | Label schema and 3 examples | B | 11/8 | – | Not in repo; plate format proposed ([docs/ocr_evaluation.md](../ocr_evaluation.md), #16) |
 | Receive | Final labels `data/labels/` | All | 11/16 | D's fake labels (`tests/fixtures/`) | Not in repo; tests use their own fake labels |
 | Receive | Fixed frames `frames/fixed/` | A | 11/15 | Original frames | Not in repo |
 | Receive | Adaptive frames `frames/adaptive/` | B | 11/18 | Fixed frames | Due 11/18 |
 | Receive | VLM scores `results/vlm/score.csv`, `timing.csv` | D | 11/21 (final after 11/22) | Fake CSV | Due 11/21 |
 | Give | `detect_plates` | D (runner) | 11/16 | Stub returning `[]` (11/8) | Merged (#14) |
 | Give | OCR results and crops `results/ocr/` | B (package), D | 11/16 | – | `python -m src.plate.run orig` once frames exist |
-| Give | `eval_ocr` | B (sensitivity) | 11/19 | – | In review (#16) |
+| Give | `eval_ocr` | B (sensitivity) | 11/19 | – | Merged (#16) |
 | Give | `summary.csv`, comparison, worse-case list | All (report, slides) | 11/24 | – | To do |
 | Give | "Pretrained vs own" table for the README | D | 11/25 | – | Ready below |
 
@@ -119,7 +118,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 - `results/ocr/<cond>.csv` columns: `frame, plate, x, y, w, h, crop_path, text, conf, status, ocr_ms`. A frame with no plate keeps one row, so all conditions list the same frames.
 - Real photos end to end: 7/10 readable and exact, 3/10 uncertain, 0 wrong readable, about 1.6 s per frame.
 
-### C-09 Evaluation — `src/eval/ocr.py`, `docs/ocr_evaluation.md` (#16)
+### C-09 Evaluation — `src/eval/ocr.py`, [docs/ocr_evaluation.md](../ocr_evaluation.md)
 
 - One-to-one matching with IoU ≥ 0.5, highest first; detection rate, exact match, char accuracy over readable labels.
 - Unreadable labels counted apart with `overconfident`; also `readable_wrong` and `missing_frames`.
@@ -148,7 +147,7 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR d
 ## Open items for Integration Check 2 (11/17)
 
 - `detect_plates(frame, cond=None, frame_id=None)`: keep the optional arguments; the old call still works.
-- Label schema: map its plate part to the format in `docs/ocr_evaluation.md`, or change `load_labels`.
+- Label schema: map its plate part to the format in [docs/ocr_evaluation.md](../ocr_evaluation.md), or change `load_labels`.
 - Condition value for snow clips in `eval_set.csv`.
 - Keep `data/clips/` and `data/frames/` out of git.
 - Run `python -m src.plate.run orig` as soon as original frames exist.

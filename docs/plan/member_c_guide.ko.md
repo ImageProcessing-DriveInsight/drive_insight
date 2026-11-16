@@ -10,8 +10,7 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 
 | | |
 | --- | --- |
-| **머지 완료** | C-01\~C-08: #2, #4, #8, #10, #12, #14 |
-| **리뷰 중** | C-09 OCR 평가: #16 |
+| **머지 완료** | C-01\~C-09: #2, #4, #8, #10, #12, #14, #16 |
 | **바로 넘길 수 있음** | `detect_plates`(D), 프레임이 오면 `run_ocr`로 `orig.csv` 생성(B, D), `eval_ocr`(B) |
 | **기다리는 것** | 원본 프레임과 라벨 스키마(B), 고정 보정 프레임(A), 적응형 보정 프레임(B), VLM 점수와 `timing.csv`(D) |
 | **다음 할 일** | 가짜 CSV로 C-10, C-11. 스키마가 오면 라벨링 |
@@ -41,7 +40,7 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 **2주차 (11/17–11/24): 평가와 집계**
 
 - [ ] 11/17 통합 점검 2: 고정 보정 프레임에 OCR이 붙는지, 라벨 불일치 확정 (안건은 아래)
-- [x] 11/17–11/19 OCR 평가 `eval_ocr` (C-09). B의 민감도 스크립트가 부를 수 있는 함수로 (#16 리뷰 중)
+- [x] 11/17–11/19 OCR 평가 `eval_ocr` (C-09). B의 민감도 스크립트가 부를 수 있는 함수로 (#16)
 - [ ] 11/19–11/20 고정·적응형 프레임 실행, `fixed.csv`, `adaptive.csv` (C-08)
 - [ ] 11/20–11/22 D의 클립 VLM 사실 검증 (ALL-04)
 - [ ] 11/20–11/24 전체 집계 `aggregate`, 조건 간 비교표 `compare` (C-10, C-11). VLM 최종 점수는 11/22 이후 다시 실행
@@ -57,14 +56,14 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 | 구분 | 무엇 | 누구 | 예정일 | 그 전까지 대역 | 11/16 상태 |
 | --- | --- | --- | --- | --- | --- |
 | 받음 | 원본 프레임 `frames/orig/` | B | 11/8 | 인터넷 번호판 사진, 내 클립에서 직접 뽑은 몇 장 | 저장소에 없음. 인터넷 사진 10장으로 개발 |
-| 받음 | 라벨 스키마와 예시 3장 | B | 11/8 | – | 저장소에 없음. 번호판 형식 제안(`docs/ocr_evaluation.md`, #16) |
+| 받음 | 라벨 스키마와 예시 3장 | B | 11/8 | – | 저장소에 없음. 번호판 형식 제안([docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md), #16) |
 | 받음 | 확정된 정답 라벨 `data/labels/` | 전원 | 11/16 | D의 가짜 라벨(`tests/fixtures/`) | 저장소에 없음. 테스트는 자체 가짜 라벨 사용 |
 | 받음 | 고정 보정 프레임 `frames/fixed/` | A | 11/15 | 원본 프레임 | 저장소에 없음 |
 | 받음 | 적응형 보정 프레임 `frames/adaptive/` | B | 11/18 | 고정 보정 프레임 | 11/18 예정 |
 | 받음 | VLM 점수 `results/vlm/score.csv`, `timing.csv` | D | 11/21 (최종값 11/22 이후) | 가짜 CSV | 11/21 예정 |
 | 줌 | `detect_plates` 함수 | D(실행기) | 11/16 | 빈 리스트를 돌려주는 껍데기(11/8) | 머지 완료(#14) |
 | 줌 | OCR 결과와 크롭 `results/ocr/` | B(패키지), D | 11/16 | – | 프레임이 오면 `python -m src.plate.run orig` |
-| 줌 | `eval_ocr` 함수 | B(민감도 실험) | 11/19 | – | 리뷰 중(#16) |
+| 줌 | `eval_ocr` 함수 | B(민감도 실험) | 11/19 | – | 머지 완료(#16) |
 | 줌 | `summary.csv`, 조건 간 비교표, 악화 사례 목록 | 전원(보고서·발표) | 11/24 | – | 예정 |
 | 줌 | README용 "사전학습 vs 직접 구현" 표 | D | 11/25 | – | 아래에 준비됨 |
 
@@ -87,7 +86,7 @@ python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv �
 
 검출과 OCR은 사전학습 모델을 쓰고, 전처리·후보 탐색·판정·평가는 직접 구현했습니다. 과제 FAQ상 사전학습 모델을 쓰면 "기존 대비 기여"를 설명해야 하므로, 직접 구현한 부분이 C의 기여가 됩니다.
 
-### C-01 모델 선정 — [docs/model_selection.md](../model_selection.md)
+### C-01 모델 선정 — [docs/model_selection.ko.md](../model_selection.ko.md)
 
 인터넷의 한국 번호판 사진 10장(주간 5장, 야간·먼 거리 5장), OCR은 손으로 자른 번호판으로 비교했습니다.
 
@@ -105,7 +104,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - `detect_plate_candidates`(직접 구현): 차량 박스 위쪽 35% 아래를 탐색합니다. 모든 창의 수직 에지 밀도와 밝기에서 주변 띠의 값을 뺀 점수를 적분 영상으로 계산합니다. 폭 8가지 × 가로세로 비 3가지(2:1, 3:1, 4.5:1)를 시도하고, 최고 창을 에지가 이어지는 범위까지 넓힌 뒤 NMS로 차량당 상위 3개를 남깁니다.
 - 실제 사진: 10/10장에서 상위 3개 안, 8/10장에서 1위. 밝기 항 덕분에 촘촘한 그릴 옆의 번호판을 찾았고, 박스 확장으로 판 가운데만 잡던 문제를 해결했습니다.
 
-### C-04\~C-06 인식 — [docs/plate_recognition.md](../plate_recognition.md)
+### C-04\~C-06 인식 — [docs/plate_recognition.ko.md](../plate_recognition.ko.md)
 
 - `preprocess_plate`(직접 구현): 그레이 → 높이 64px 쌍선형 리사이즈 → 대비 스트레칭 → 글자를 어둡게 맞춤 → 기울기 보정 ±10°(행 투영이 가장 몰리는 각도) → Otsu(선택). OpenCV와 비교하면 리사이즈 차이 ≤ 1, Otsu는 완전히 같습니다(테스트에서만 비교).
 - 전처리 비교: 손 크롭에서는 원본·그레이·기울기 보정 모두 7/10이었지만 Otsu는 2/10이었습니다. 자동 후보 크롭에서는 그레이+스트레칭+기울기 보정이 원본과 같은 수(7/10)를 읽으면서, 대상이 아닌 크롭을 자신 있게 읽는 경우가 줄었습니다(2 → 0). 그래서 기본값은 이진화 없음입니다.
@@ -119,7 +118,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - `results/ocr/<cond>.csv` 열: `frame, plate, x, y, w, h, crop_path, text, conf, status, ocr_ms`. 번호판이 없는 프레임도 한 줄을 남겨 세 조건의 프레임 목록이 같게 합니다.
 - 실제 사진으로 끝까지 실행: readable·정확 7/10, uncertain 3/10, 틀린 readable 0건, 장당 약 1.6초.
 
-### C-09 평가 — `src/eval/ocr.py`, `docs/ocr_evaluation.md` (#16)
+### C-09 평가 — `src/eval/ocr.py`, [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)
 
 - IoU ≥ 0.5, 1:1, 큰 순서로 짝짓고, 읽을 수 있는 라벨 기준으로 검출률·완전일치율·문자 정확도를 계산합니다.
 - unreadable 라벨은 따로 세고 과신 건수(`overconfident`)를 보고합니다. `readable_wrong`, `missing_frames`도 있습니다.
@@ -148,7 +147,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 ## 통합 점검 2(11/17) 안건
 
 - `detect_plates(frame, cond=None, frame_id=None)`: 선택 인자 유지. 기존 호출도 그대로 동작합니다.
-- 라벨 스키마: 번호판 부분을 `docs/ocr_evaluation.md`의 형식으로 맞추거나 `load_labels`만 수정합니다.
+- 라벨 스키마: 번호판 부분을 [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)의 형식으로 맞추거나 `load_labels`만 수정합니다.
 - 눈 클립에 쓸 `eval_set.csv`의 condition 값.
 - `data/clips/`, `data/frames/`는 git에서 제외.
 - 원본 프레임이 오면 바로 `python -m src.plate.run orig` 실행.

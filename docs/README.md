@@ -10,12 +10,12 @@
 | Feature spec by member, with status | [feature_spec.md](plan/feature_spec.md) | [feature_spec.ko.md](plan/feature_spec.ko.md) |
 | Member C guide: plate recognition and evaluation | [member_c_guide.md](plan/member_c_guide.md) | [member_c_guide.ko.md](plan/member_c_guide.ko.md) |
 
-## Technical notes (English)
+## Technical notes
 
-| Doc | Content |
-| --- | --- |
-| [model_selection.md](model_selection.md) | C-01: detector and OCR comparison, versions, licenses |
-| [plate_recognition.md](plate_recognition.md) | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format |
-| `ocr_evaluation.md` (PR #16) | C-09: metrics and proposed plate label format |
+| Doc | English | 한국어 |
+| --- | --- | --- |
+| C-01: detector and OCR comparison, versions, licenses | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
+| C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
+| C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.

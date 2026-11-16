@@ -49,15 +49,15 @@ DriveInsight · Team 16 Black Box · **최신화 2026-11-16**
 
 | ID | 기능 | 입력 → 출력 | 요구사항 | 검증 방법 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| C-01 | 모델 선정 | → 선정 메모 | 차량 검출기, 번호판 검출기, 한국어 OCR 후보를 한국 번호판 샘플 10장으로 비교. 모델명·버전·가중치 출처 기록 | 10장 중 읽힌 수 기록 | 완료(#4, #8): YOLOv8n 차량 10/10, PaddleOCR 7/10, EasyOCR 3/10. [메모](../model_selection.md) |
+| C-01 | 모델 선정 | → 선정 메모 | 차량 검출기, 번호판 검출기, 한국어 OCR 후보를 한국 번호판 샘플 10장으로 비교. 모델명·버전·가중치 출처 기록 | 10장 중 읽힌 수 기록 | 완료(#4, #8): YOLOv8n 차량 10/10, PaddleOCR 7/10, EasyOCR 3/10. [메모](../model_selection.ko.md) |
 | C-02 | 차량 검출 | `detect_vehicles(img) -> [{bbox, cls, conf}]` | car, truck, bus, motorcycle. `conf` ≥ 0.4. bbox는 `(x, y, w, h)`, 큰 박스부터 | 라벨 차량과 IoU ≥ 0.5 비율 | 완료(#10) |
 | C-03 | 번호판 후보 검출 | `detect_plate_candidates(img, vehicles) -> [bbox]` | 직접 구현: 차량 박스 아래쪽 탐색. 수직 에지 밀도와 밝기를 주변 띠와 비교해 점수 계산(적분 영상), 최고 창을 판 전체로 확장, 차량당 상위 3개, 차량이 없으면 프레임 전체 | 라벨 번호판 검출률 | 완료(#10): 실제 사진 10/10장에서 상위 3개 안, 8/10장에서 1위 |
-| C-04 | 크롭 전처리 | `preprocess_plate(crop, binarize=False, deskew=True) -> 그레이 크롭` | 직접 구현: 그레이 변환(가중합), 높이 64px 쌍선형 리사이즈, 대비 스트레칭, 글자를 어둡게 맞춤, 기울기 보정 ±10°, Otsu(선택) | 전처리 유무별 OCR 정확도 비교 | 완료(#12): 기본값 그레이+스트레칭+기울기 보정. Otsu는 2/10으로 떨어져 끔. [노트](../plate_recognition.md) |
+| C-04 | 크롭 전처리 | `preprocess_plate(crop, binarize=False, deskew=True) -> 그레이 크롭` | 직접 구현: 그레이 변환(가중합), 높이 64px 쌍선형 리사이즈, 대비 스트레칭, 글자를 어둡게 맞춤, 기울기 보정 ±10°, Otsu(선택) | 전처리 유무별 OCR 정확도 비교 | 완료(#12): 기본값 그레이+스트레칭+기울기 보정. Otsu는 2/10으로 떨어져 끔. [노트](../plate_recognition.ko.md) |
 | C-05 | 문자 인식 | `recognize(crop) -> (text, conf)` | PaddleOCR `korean`. 두 줄 번호판은 위→아래로 이음. `O`→`0`, `I`/`l`→`1`, 숫자·한글만 남김. conf는 박스 점수 중 최솟값. 형식 `^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$`(지역명 허용) | 라벨 문자열과 비교 | 완료(#12) |
 | C-06 | 상태 판정 | `judge(text, conf) -> (status, text)` | `readable`: 형식 일치 + `conf` ≥ 0.8. `uncertain`: `conf` ≥ 0.5이고, 형식은 맞지만 `conf` < 0.8이거나 한 자리만 고치면 형식이 맞음(그 자리는 `?`). `unreadable`: 그 외, `text = None`. uncertain에 `?`가 필요해 text도 함께 반환 | 판정별 단위 테스트 | 완료(#12): 실제 사진에서 틀린 답이 readable로 나온 경우 0건 |
 | C-07 | 통합 함수 | `detect_plates(frame, cond=None, frame_id=None) -> [PlateResult]` | 공통 인터페이스 형식. 차량당 결과 하나: 후보를 순서대로 읽다 readable이면 멈추고 가장 좋은 결과 유지. 크롭은 `results/ocr/crops/<cond>/<frame_id>_<n>.png` | 필드 누락 0건 | 완료(#14). 선택 인자는 11/17 확정 |
 | C-08 | 조건별 실행 | `run_ocr(cond)`, `python -m src.plate.run <cond>`: `frames/<cond>/` → `results/ocr/<cond>.csv` | `orig`, `fixed`, `adaptive`를 같은 프레임 목록으로. 번호판이 없는 프레임도 빈 행 하나 유지 | 세 CSV의 프레임 목록 일치 | 코드 완료(#14), 실행은 프레임 대기 |
-| C-09 | OCR 평가 | `eval_ocr(results, labels) -> dict`, `python -m src.eval.ocr` → `ocr_summary.csv` | 검출률(IoU ≥ 0.5, 1:1, 큰 순서), 완전일치율, 문자 정확도(1 − 편집 거리 / 길이). unreadable 라벨은 별도 집계하고 과신 건수 보고. `readable_wrong`, C-11용 `frame_char_accuracy`도 제공. B의 민감도 스크립트가 호출 가능 | 손으로 계산한 3건과 일치 | 리뷰 중(#16). 번호판 라벨 형식은 `docs/ocr_evaluation.md`에 제안 |
+| C-09 | OCR 평가 | `eval_ocr(results, labels) -> dict`, `python -m src.eval.ocr` → `ocr_summary.csv` | 검출률(IoU ≥ 0.5, 1:1, 큰 순서), 완전일치율, 문자 정확도(1 − 편집 거리 / 길이). unreadable 라벨은 별도 집계하고 과신 건수 보고. `readable_wrong`, C-11용 `frame_char_accuracy`도 제공. B의 민감도 스크립트가 호출 가능 | 손으로 계산한 3건과 일치 | 완료(#16). 번호판 라벨 형식은 [노트](../ocr_evaluation.ko.md)에 제안 |
 | C-10 | 전체 집계 | `aggregate(results_dir) -> summary.csv` | OCR 지표, D의 VLM 점수, `timing.csv`를 조건별로 합침 | 원본 CSV들과 수치 일치 | 예정(껍데기, D의 CSV 필요) |
 | C-11 | 조건 간 비교표 | `compare(summary) -> 비교표, 사례 목록` | `orig` 대 `fixed`, `fixed` 대 `adaptive`에서 프레임별 개선·악화 건수를 모두 표시. 악화 사례는 크롭 경로와 함께 출력 | 개선 + 악화 + 변화 없음 = 전체 프레임 수 | 예정 |
 
