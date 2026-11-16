@@ -36,8 +36,10 @@ def _gaussian_blur(img, ksize, sigma):
         residual = value - coefficient
         integer_kernel[index] = integer_kernel[-index - 1] = coefficient
     integer_kernel[radius] = 256 - 2 * integer_kernel[:radius].sum()
-    kernel = integer_kernel / 256.0
-    source = img.astype(np.float64)
+    kernel = integer_kernel.astype(np.float32) / 256.0
+    # Products have at most 8 integer + 16 fraction bits after two passes,
+    # so float32 stores these fixed-point sums exactly while halving buffers.
+    source = img.astype(np.float32)
     height, width = img.shape[:2]
     padded = np.pad(source, ((0, 0), (radius, radius), (0, 0)), mode="reflect")
     horizontal = np.zeros_like(source)
@@ -76,7 +78,10 @@ def median(img, ksize):
     windows = np.lib.stride_tricks.sliding_window_view(padded, (ksize, ksize), axis=(0, 1))
     out = np.empty_like(img)
     for start in range(0, img.shape[0], 64):
-        out[start:start + 64] = np.median(windows[start:start + 64], axis=(-2, -1))
+        # Partition an owned buffer in place; never write into the overlapping view.
+        block = np.ascontiguousarray(windows[start:start + 64])
+        block = block.reshape(*block.shape[:3], ksize * ksize)
+        out[start:start + 64] = np.median(block, axis=-1, overwrite_input=True)
     return out
 
 
