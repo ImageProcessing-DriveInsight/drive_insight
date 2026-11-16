@@ -1,0 +1,4 @@
+numpy>=1.24,<3
+pytest>=7,<10
+# Reference implementation used only by tests (also provides image I/O).
+opencv-python>=4.8,<5
