@@ -63,6 +63,23 @@ def gaussian(img, ksize, sigma):
     return np.clip(np.floor(_gaussian_blur(img, ksize, sigma) + 0.5), 0, 255).astype(np.uint8)
 
 
+def median(img, ksize):
+    """Median of each BGR channel in a 3x3 or 5x5 window, replicating borders.
+
+    Process vectorized row blocks to bound the temporary partition array's size.
+    No channel mixing, pixel loops or input mutation.
+    """
+    validate_frame(img)
+    _validate_ksize(ksize, (3, 5))
+    radius = ksize // 2
+    padded = np.pad(img, ((radius, radius), (radius, radius), (0, 0)), mode="edge")
+    windows = np.lib.stride_tricks.sliding_window_view(padded, (ksize, ksize), axis=(0, 1))
+    out = np.empty_like(img)
+    for start in range(0, img.shape[0], 64):
+        out[start:start + 64] = np.median(windows[start:start + 64], axis=(-2, -1))
+    return out
+
+
 def gamma(img, g):
     """Apply Y'=255*(Y/255)**g via a 256-entry LUT; g<1 brightens."""
     validate_frame(img)
