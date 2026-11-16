@@ -35,7 +35,7 @@ Data work is split by clip. Each member collects clips for one condition, labels
 - **Label review:** disagreements are settled at Integration Check 2 (11/17).
 - **VLM fact check:** use the sheet D makes on 11/18. Condition names are hidden. Each claim is correct, unsupported or uncheckable.
 
-> **Status 11/16:** no label schema, `eval_set.csv` or frames are in the repo yet. C proposed a minimal plate label format in `docs/ocr_evaluation.md` (PR #16).
+> **Status 11/16:** no label schema, `eval_set.csv` or frames are in the repo yet. C proposed a minimal plate label format in [docs/ocr_evaluation.md](../ocr_evaluation.md) (#16).
 
 ## Common rules
 
@@ -141,7 +141,7 @@ Development only, starting 11/7. Original frames are shared on 11/8, fixed frame
 | 3.4 | Own crop preprocessing (gray, resize, contrast, Otsu, deskew) | C | 11/12–11/14 | `preprocess.py` | 3.3 | Done (#12) |
 | 3.5 | OCR and status rules | C | 11/14–11/16 | `recognize`, `judge` | 3.4 | Done (#12) |
 | 3.6 | `detect_plates`, original frame results | C | 11/16 | `results/ocr/orig.csv` | 3.5 | Code done (#14), CSV waits for frames |
-| 3.7 | OCR evaluation (detection, exact match, char accuracy) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | In review (#16) |
+| 3.7 | OCR evaluation (detection, exact match, char accuracy) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | Done (#16) |
 | 3.8 | Run on fixed and adaptive frames | C | 11/19–11/20 | `fixed.csv`, `adaptive.csv` | 3.7, 1.9, 2.7 | Waits for frames |
 | 3.9 | Aggregation (OCR, VLM, time), comparison, better/worse counts | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | To do |
 | **4** | **Experiment runner + VLM + environment** | **D** | **11/7–11/28** |  |  |  |
@@ -195,7 +195,7 @@ gantt
     Model selection 3.1            :done, c1, 2026-11-07, 2026-11-09
     Detect, preprocess, OCR 3.2–3.5 :done, c2, 2026-11-09, 2026-11-17
     detect_plates 3.6              :milestone, done, c3, 2026-11-16, 0d
-    OCR eval 3.7                   :active, c4, 2026-11-16, 2026-11-20
+    OCR eval 3.7                   :done, c4, 2026-11-16, 2026-11-20
     Fixed, adaptive runs 3.8       :c5, 2026-11-19, 2026-11-21
     Aggregate, compare 3.9         :c6, 2026-11-20, 2026-11-25
     section D · runner, VLM, env
@@ -229,7 +229,7 @@ The integration checks are on 11/10, 11/17 and 11/24. Each one joins what exists
 | # | Item | Owner | Proposal |
 | --- | --- | --- | --- |
 | 1 | `detect_plates` optional `cond`, `frame_id` arguments | C | Keep; old call still works |
-| 2 | Label schema; plate part of it | B, C | Use the plate format in `docs/ocr_evaluation.md` or map B's schema to it |
+| 2 | Label schema; plate part of it | B, C | Use the plate format in [docs/ocr_evaluation.md](../ocr_evaluation.md) or map B's schema to it |
 | 3 | `eval_set.csv` condition value for snow clips (only `low_light/rain/fog` today) | B | Add `snow` or merge into `fog` |
 | 4 | `data/clips/`, `data/frames/` in git? (file size, real plates) | All | Keep out of git, share by drive |
 | 5 | Merge `requirements-*.txt` into `requirements.txt` | D | Pins in the risks table below; ultralytics brings `opencv-python` 5.x, PaddleOCR brings `opencv-contrib-python` 4.10 |
