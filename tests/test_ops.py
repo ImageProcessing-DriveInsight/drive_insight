@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.dip import bgr_to_ycrcb, gamma, hist_eq, ycrcb_to_bgr
+from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, ycrcb_to_bgr
 
 
 def sample_frame():
@@ -108,3 +108,52 @@ def test_opencv_histogram_reference():
     assert error(hist_eq(img), ycrcb_to_bgr(ycrcb)).mean() <= 1
     ramp = gray(np.random.default_rng(3).integers(25, 180, (80, 90), dtype=np.uint8))
     np.testing.assert_array_equal(hist_eq(ramp)[..., 0], cv2.equalizeHist(ramp[..., 0]))
+
+
+@pytest.mark.parametrize("ksize", [3, 5, 7, 9])
+@pytest.mark.parametrize("sigma", [0.1, 0.7, 1.5, 3.0, 100.0])
+@pytest.mark.parametrize("shape", [(17, 23, 3), (1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_gaussian_reference(ksize, sigma, shape):
+    import cv2
+    img = np.random.default_rng(29).integers(0, 256, shape, dtype=np.uint8)
+    expected = cv2.GaussianBlur(img, (ksize, ksize), sigma, borderType=cv2.BORDER_REFLECT_101)
+    assert error(gaussian(img, ksize, sigma), expected).max() <= 1
+
+
+@pytest.mark.parametrize("value", [0, 71, 255])
+def test_gaussian_constant_and_input_preservation(value):
+    img = np.full((5, 7, 3), value, dtype=np.uint8)[:, ::-1]
+    before = img.copy()
+    out = gaussian(img, 9, 1.2)
+    np.testing.assert_array_equal(out, before)
+    np.testing.assert_array_equal(img, before)
+    assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+
+
+@pytest.mark.parametrize("ksize", [0, 1, 2, 4, 11, 3.0, True, None, '3'])
+def test_gaussian_invalid_size(ksize):
+    with pytest.raises(ValueError):
+        gaussian(sample_frame(), ksize, 1)
+
+
+@pytest.mark.parametrize("sigma", [0, -1, np.nan, np.inf, True, None, '1', 1j])
+def test_gaussian_invalid_sigma(sigma):
+    with pytest.raises(ValueError):
+        gaussian(sample_frame(), 3, sigma)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_gaussian_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        gaussian(bad, 3, 1)
+
+
+def test_gaussian_channel_independence_and_strides():
+    img = np.zeros((13, 17, 3), np.uint8)
+    img[6, 8, 0] = 255
+    before = img.copy()
+    out = gaussian(img[:, ::-1], np.int64(5), np.float64(1.2))
+    assert out[..., 0].max() > 0
+    assert not out[..., 1:].any()
+    np.testing.assert_array_equal(img, before)
