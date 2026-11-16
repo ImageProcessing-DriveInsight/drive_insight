@@ -17,5 +17,7 @@
 | C-01: detector and OCR comparison, versions, licenses | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
+| C-10: `summary.csv` per condition, proposed `score.csv` format | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
+| C-11: better and worse frames between conditions, worse-case list | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.
