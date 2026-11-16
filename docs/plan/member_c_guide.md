@@ -10,10 +10,10 @@ C finds and reads vehicles and plates (`src/plate/`) and combines the three cond
 
 | | |
 | --- | --- |
-| **Merged** | C-01 to C-09: #2, #4, #8, #10, #12, #14, #16 |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` → `orig.csv` as soon as frames exist (B, D), `eval_ocr` (B) |
+| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26 |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` → `orig.csv` as soon as frames exist (B, D), `eval_ocr` (B), `summary.csv` and `compare.csv` once results exist (all) |
 | **Waiting for** | Original frames and label schema (B), fixed frames (A), adaptive frames (B), VLM scores and `timing.csv` (D) |
-| **Next** | C-10, C-11 with fake CSVs; labeling once the schema arrives |
+| **Next** | Labeling once the schema arrives; run OCR → eval → aggregate → compare on real frames |
 
 ## Schedule
 
@@ -43,7 +43,8 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 - [x] 11/17–11/19 OCR evaluation `eval_ocr`, callable from B's sensitivity script (C-09, #16)
 - [ ] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08)
 - [ ] 11/20–11/22 VLM fact check of D's clips (ALL-04)
-- [ ] 11/20–11/24 Aggregation `aggregate`, comparison `compare` (C-10, C-11); rerun VLM final scores after 11/22
+- [x] Aggregation `aggregate`, comparison `compare` with fake CSVs (C-10, C-11, #24, #26)
+- [ ] 11/22–11/24 Rerun aggregation and comparison on real results, after the final VLM scores
 - [ ] 11/24 Integration Check 3: results for three conditions fixed
 
 **Last week (11/25–11/28)**
@@ -60,11 +61,11 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 | Receive | Final labels `data/labels/` | All | 11/16 | D's fake labels (`tests/fixtures/`) | Not in repo; tests use their own fake labels |
 | Receive | Fixed frames `frames/fixed/` | A | 11/15 | Original frames | Not in repo |
 | Receive | Adaptive frames `frames/adaptive/` | B | 11/18 | Fixed frames | Due 11/18 |
-| Receive | VLM scores `results/vlm/score.csv`, `timing.csv` | D | 11/21 (final after 11/22) | Fake CSV | Due 11/21 |
+| Receive | VLM scores `results/vlm/score.csv`, `timing.csv` | D | 11/21 (final after 11/22) | Fake CSV | Due 11/21; format proposed in [docs/aggregation.md](../aggregation.md) |
 | Give | `detect_plates` | D (runner) | 11/16 | Stub returning `[]` (11/8) | Merged (#14) |
 | Give | OCR results and crops `results/ocr/` | B (package), D | 11/16 | – | `python -m src.plate.run orig` once frames exist |
 | Give | `eval_ocr` | B (sensitivity) | 11/19 | – | Merged (#16) |
-| Give | `summary.csv`, comparison, worse-case list | All (report, slides) | 11/24 | – | To do |
+| Give | `summary.csv`, comparison, worse-case list | All (report, slides) | 11/24 | – | Code merged (#24, #26); numbers after real results |
 | Give | "Pretrained vs own" table for the README | D | 11/25 | – | Ready below |
 
 `detect_plates` always returns a list of `{"bbox", "crop_path", "text", "conf", "status"}` dicts, or an empty list when there is no plate. `cond` and `frame_id` are optional extra arguments (to confirm on 11/17).
@@ -77,7 +78,9 @@ python -m pytest tests/
 python tools/model_check.py <samples>          # C-01: compare detector and OCR on samples
 python tools/preprocess_check.py <samples>     # C-04: OCR with and without preprocessing
 python -m src.plate.run orig                   # C-08: data/frames/orig → results/ocr/orig.csv
-python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv (#16)
+python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
+python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
+python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
 ```
 
 `<samples>` has `full/`, `crops/` and `labels.csv` (`file,text`). Keep sample photos outside the repo.
@@ -125,11 +128,17 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 - `frame_char_accuracy` gives per-frame scores for C-11.
 - Three hand-computed cases in `tests/test_ocr_eval.py`.
 
-### C-10, C-11 Aggregation and comparison (to do)
+### C-10 Aggregation — `src/eval/aggregate.py`, [docs/aggregation.md](../aggregation.md)
 
-- `summary.csv`: one row per condition with detection rate, exact match, char accuracy, overconfident, VLM scene accuracy, hallucination rate, mean time per step. Columns already fixed in `src/eval/aggregate.py`.
-- Compare `orig` vs `fixed` and `fixed` vs `adaptive`. A frame is better if its char accuracy goes up, worse if it goes down, unchanged otherwise; the three counts must add up to the total.
-- List worse cases with crop paths. The proposal promised not to assume enhancement always helps, so these are the strongest slides.
+- `summary.csv`: one row per condition with plates, detection rate, exact match, char accuracy, overconfident, readable_wrong, VLM scene accuracy, hallucination rate, uncheckable claims, mean ms per step.
+- VLM counts are pooled over clips when `score.csv` has them, else the row rates are averaged. A missing file leaves its columns empty, so it runs before all results exist.
+- Hand-computed cases in `tests/test_aggregate.py`.
+
+### C-11 Comparison — `src/eval/compare.py`, [docs/comparison.md](../comparison.md)
+
+- `orig` → `fixed` and `fixed` → `adaptive`. A frame is better if its mean char accuracy goes up, worse if it goes down, unchanged otherwise. Frames without a readable label or missing from a CSV are counted apart, so the three counts add up to the compared frames.
+- `compare.csv` adds metric changes from `summary.csv`. `worse_cases.csv` lists each plate that got worse with both crop paths, largest drop first. The proposal promised not to assume enhancement always helps, so these are the strongest slides.
+- Hand-computed cases in `tests/test_compare.py`.
 
 ## Pretrained vs own implementation (for the README)
 
@@ -150,6 +159,9 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR d
 - Label schema: map its plate part to the format in [docs/ocr_evaluation.md](../ocr_evaluation.md), or change `load_labels`.
 - Condition value for snow clips in `eval_set.csv`.
 - Keep `data/clips/` and `data/frames/` out of git.
+- `compare(results_dir, labels)` instead of `compare(summary)`: frame counts need the OCR CSVs and labels.
+- `vlm/score.csv` columns with D: counts per condition and clip ([docs/aggregation.md](../aggregation.md)).
+- Result CSVs with plate text (`results/ocr/<cond>.csv`, `worse_cases.csv`): keep real ones out of git.
 - Run `python -m src.plate.run orig` as soon as original frames exist.
 
 ## Risks and outcomes
@@ -160,7 +172,7 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR d
 | Plate detector misses Korean plates | 11/10–11/12, C-03 | Own edge and ratio search in vehicle boxes; else labeled boxes + OCR only | Own search used: plate in top 3 for 10/10 |
 | Dashcam plates too small | 11/16, original results | Pick timestamps with bigger plates, ask B to add them | Unknown until frames arrive |
 | Install or GPU problems | 11/8 | CPU and small (n) models | CPU works. On one PC: `pandas==2.2.3`, `chardet==5.2.0` (Windows Application Control), `enable_mkldnn=False` (PaddlePaddle 3.3 CPU), antivirus HTTPS scanning needs the OS cert store |
-| Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Happening: no schema in the repo; eval done with fake labels (#16) |
+| Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Happening: no schema in the repo; eval, aggregation and comparison done with fake files (#16, #24, #26) |
 
 ## Final checklist before submission
 
@@ -171,8 +183,8 @@ When all of these hold before 11/25, C's part is done.
 - [ ] `orig.csv`, `fixed.csv`, `adaptive.csv` list exactly the same frames — needs frames
 - [x] Every result row has `bbox`, `crop_path`, `text`, `conf`, `status`, and `text` is `None` when `unreadable` (tests)
 - [x] `eval_ocr` matches 3 hand-computed cases (#16)
-- [ ] Better + worse + unchanged = total frames in the comparison — C-11
+- [x] Better + worse + unchanged = compared frames in the comparison (#26, tests)
 - [x] Model name, version, weight source and license of the detector and OCR in the selection memo
 - [ ] "Pretrained vs own" table given to D for the README — table ready above
 - [ ] README explains how weights are downloaded — automatic in code; README is D's
-- [ ] 3 better and 3 worse crop images for the slides — after C-11
+- [ ] 3 better and 3 worse crop images for the slides — worse ones from `worse_cases.csv`, better ones by hand, once real results exist
