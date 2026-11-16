@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, ycrcb_to_bgr
+from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, median, ycrcb_to_bgr
 
 
 def sample_frame():
@@ -157,3 +157,43 @@ def test_gaussian_channel_independence_and_strides():
     assert out[..., 0].max() > 0
     assert not out[..., 1:].any()
     np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("ksize", [3, 5])
+@pytest.mark.parametrize("shape", [(70, 23, 3), (1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_median_reference(ksize, shape):
+    import cv2
+    img = np.random.default_rng(30).integers(0, 256, shape, dtype=np.uint8)
+    np.testing.assert_array_equal(median(img, ksize), cv2.medianBlur(img, ksize))
+
+
+@pytest.mark.parametrize("ksize", [3, 5])
+def test_median_removes_salt_pepper_and_preserves_channels(ksize):
+    img = np.tile(np.array([40, 100, 160], np.uint8), (11, 13, 1))
+    expected = img.copy()
+    img[3, 3] = 0
+    img[7, 8] = 255
+    before = img.copy()
+    np.testing.assert_array_equal(median(img[:, ::-1], ksize), expected[:, ::-1])
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("value", [0, 83, 255])
+def test_median_constant(value):
+    img = np.full((3, 7, 3), value, np.uint8)
+    out = median(img, np.int64(5))
+    np.testing.assert_array_equal(out, img)
+    assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+
+
+@pytest.mark.parametrize("ksize", [0, 1, 2, 4, 7, 9, 3.0, True, None, '3'])
+def test_median_invalid_size(ksize):
+    with pytest.raises(ValueError):
+        median(sample_frame(), ksize)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_median_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        median(bad, 3)
