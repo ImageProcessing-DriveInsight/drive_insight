@@ -1,5 +1,7 @@
 # OCR Evaluation (C-09)
 
+[한국어](ocr_evaluation.ko.md)
+
 `eval_ocr(results, labels)` scores one condition. `python -m src.eval.ocr` scores every
 `results/ocr/<cond>.csv` and writes `results/ocr/ocr_summary.csv`.
 
