@@ -217,7 +217,11 @@ def main():
         rows = []
         print(f"\n[ocr] {'model':<10} {'read':>6} {'char_acc':>9} {'format_ok':>10} {'conf':>6} {'ms':>6}")
         for name in args.ocr:
-            r = check_ocr(ENGINES[name](), crops, labels)
+            try:
+                r = check_ocr(ENGINES[name](), crops, labels)
+            except Exception as e:  # keep results of the other engines
+                print(f"      {name:<10} failed: {type(e).__name__}: {e}")
+                continue
             rows += r
             n = len(r)
             print(
@@ -226,7 +230,8 @@ def main():
                 f"{sum(x['format_ok'] for x in r):>7}/{n:<2} "
                 f"{np.mean([x['conf'] for x in r]):>6.2f} {np.mean([x['ms'] for x in r]):>6.0f}"
             )
-        write_csv(out_dir / "ocr.csv", rows)
+        if rows:
+            write_csv(out_dir / "ocr.csv", rows)
 
     if not full and not crops:
         print(f"no images in {args.samples / 'full'} or {args.samples / 'crops'}")
