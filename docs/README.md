@@ -14,6 +14,7 @@
 
 | Doc | English | 한국어 |
 | --- | --- | --- |
+| A-01 to A-06: parameters, decisions, experiments, performance and integration | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
 | C-01: detector and OCR comparison, versions, licenses | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
