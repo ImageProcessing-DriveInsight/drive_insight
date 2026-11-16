@@ -1,5 +1,7 @@
 # Model Selection (C-01)
 
+[한국어](model_selection.ko.md)
+
 Pick a pretrained model for vehicle detection, plate detection and Korean OCR.
 Test set: 10 Korean plate images (5 clear daytime, 5 night or far).
 
@@ -8,12 +10,14 @@ Test set: 10 Korean plate images (5 clear daytime, 5 night or far).
 | Step | Model | Version | Weights source | License |
 | --- | --- | --- | --- | --- |
 | Vehicle detection | YOLOv8n (COCO) | ultralytics 8.4.208 | `yolov8n.pt`, github.com/ultralytics/assets release v8.4.0 | AGPL-3.0 |
-| Plate detection | Not tested yet | - | - | - |
+| Plate detection | No pretrained model; own search inside the vehicle box (C-03) | - | - | - |
 | OCR | EasyOCR (`ko`) | easyocr 1.7.2, torch 2.15.0 (CPU) | `craft_mlt_25k.pth`, `korean_g2.pth`, EasyOCR GitHub releases | Apache-2.0 |
 | OCR | PaddleOCR (`korean`) | paddleocr 3.7.0, paddlepaddle 3.3.1 (CPU) | `PP-OCRv5_server_det`, `korean_PP-OCRv5_mobile_rec`, Hugging Face (PaddleX default) | Apache-2.0 |
 
 Weights download automatically on first run:
 YOLO to `weights/` (ignored by git), EasyOCR to `~/.EasyOCR/model/`, PaddleOCR to `~/.paddlex/official_models/`.
+
+No pretrained plate detector is used. Public weights are pickle files from unknown sources, which can run code when loaded.
 
 ## Test set
 
@@ -65,7 +69,7 @@ EasyOCR missed one night plate with a 3-digit prefix (conf 0.557).
 ## Decision
 
 - Vehicle detection: YOLOv8n. Found vehicles in 10/10 at 19 ms/img on CPU.
-- Plate detection: TBD. Not tested. Plan: search inside the vehicle box (C-03).
+- Plate detection: own candidate search inside the vehicle box (C-03). On the 10 real photos the plate was in the top 3 candidates for 10/10 and first for 8/10.
 - OCR: PaddleOCR. Read 7/10 vs 3/10 for EasyOCR. ~0.3 s/img is fine for 30–50 eval frames.
 
 If OCR reads 3 or fewer of 10, try another OCR or focus on char accuracy.
