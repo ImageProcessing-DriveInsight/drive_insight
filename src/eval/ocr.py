@@ -67,7 +67,7 @@ def load_labels(labels):
 
 
 def load_results(results):
-    """<cond>.csv path or its rows -> {frame: [{"bbox", "text", "status"}]}; frames without plates map to []."""
+    """<cond>.csv path or its rows -> {frame: [{"bbox", "text", "status", "crop_path"}]}; frames without plates map to []."""
     rows = results
     if isinstance(results, (str, Path)):
         with open(results, encoding="utf-8-sig") as f:
@@ -77,7 +77,8 @@ def load_results(results):
         plates = out.setdefault(frame_key(r["frame"]), [])
         if r.get("status"):
             plates.append({"bbox": (int(r["x"]), int(r["y"]), int(r["w"]), int(r["h"])),
-                           "text": r.get("text") or None, "status": r["status"]})
+                           "text": r.get("text") or None, "status": r["status"],
+                           "crop_path": r.get("crop_path") or None})
     return out
 
 
@@ -152,6 +153,31 @@ def eval_ocr(results, labels) -> dict:
 def frame_char_accuracy(results, labels) -> dict:
     """{frame: mean char accuracy of its readable labeled plates, or None if it has none}."""
     return score(results, labels)[1]
+
+
+def plate_details(results, labels) -> dict:
+    """{frame: [{"label", "text", "status", "crop_path", "char_acc"}]}, one entry per readable labeled plate.
+
+    A missed plate has text, status and crop_path None and char_acc 0. Frames missing from the
+    results are left out; frames without a readable labeled plate map to [].
+    The mean char_acc of a frame equals frame_char_accuracy.
+    """
+    preds, gold = load_results(results), load_labels(labels)
+    out = {}
+    for frame, labs in gold.items():
+        if frame not in preds:
+            continue
+        matched = match_frame(preds[frame], labs)
+        plates = []
+        for i, lab in enumerate(labs):
+            if lab["text"] is None:
+                continue
+            p = matched.get(i) or {}
+            plates.append({"label": lab["text"], "text": p.get("text"), "status": p.get("status"),
+                           "crop_path": p.get("crop_path"),
+                           "char_acc": char_accuracy(p.get("text"), lab["text"]) if p else 0.0})
+        out[frame] = plates
+    return out
 
 
 def write_summary(rows, path):
