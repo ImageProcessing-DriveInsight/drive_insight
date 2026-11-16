@@ -80,6 +80,27 @@ def median(img, ksize):
     return out
 
 
+def unsharp(img, amount, sigma, threshold):
+    """Sharpen BGR channels: img + amount*(img-blur), clipped to uint8.
+
+    Apply only where abs(img-blur) >= threshold (per channel).
+    amount/threshold are finite and nonnegative; sigma is finite and positive.
+    Gaussian radius is ceil(3*sigma), limited to 1..4 (ksize 3..9).
+    """
+    validate_frame(img)
+    _validate_real(amount, "amount")
+    _validate_real(sigma, "sigma", strictly_positive=True)
+    _validate_real(threshold, "threshold")
+    if amount == 0:
+        return img.copy()
+    radius = max(1, int(np.ceil(min(3.0 * sigma, 4.0))))
+    source = img.astype(np.float64)
+    difference = source - gaussian(img, 2 * radius + 1, sigma).astype(np.float64)
+    difference = np.where(np.abs(difference) >= threshold, difference, 0.0)
+    with np.errstate(over="ignore"):
+        return to_uint8(source + amount * difference)
+
+
 def gamma(img, g):
     """Apply Y'=255*(Y/255)**g via a 256-entry LUT; g<1 brightens."""
     validate_frame(img)
