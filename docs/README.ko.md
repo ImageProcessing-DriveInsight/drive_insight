@@ -14,7 +14,8 @@
 
 | 문서 | English | 한국어 |
 | --- | --- | --- |
-| A-01~06: 파라미터, 구현 결정, 실험·성능·연동 가이드 | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
+| A-01~09: 파라미터, 구현 결정, 실험·성능·연동 가이드 | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
+| A-09: 고정 PNG 일괄 생성, JSON 로그, 실패 복구 | — | [fixed_batch.ko.md](fixed_batch.ko.md) |
 | C-01: 검출기·OCR 비교, 버전, 라이선스 | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04\~C-08: 전처리 비교, 판정 규칙, 파이프라인, CSV 형식 | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: 평가 지표와 번호판 라벨 형식 제안 | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
