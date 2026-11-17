@@ -35,6 +35,7 @@ from src.dip import gamma, hist_eq  # noqa: E402
 from src.eval.ocr import char_accuracy  # noqa: E402
 from src.plate.detect import STATUS_RANK, detect_plates, detect_vehicles, read_plate  # noqa: E402
 from src.plate.imgutil import load_png  # noqa: E402
+from src.plate.judge import PLATE_RE  # noqa: E402
 
 WIDTHS = (120, 100, 80, 60, 50, 40, 30, 25, 20)  # target plate width in px
 WIDTH_TOL = 0.95  # a sample counts for width W only if its plate is at least WIDTH_TOL * W wide (no upscaling)
@@ -152,6 +153,15 @@ def read_labels(path):
     raise ValueError(f"cannot decode {path}")
 
 
+def real_plates(labels):
+    """Split labels into real plates and the names of the rest (e.g. carmaker advertising plates).
+
+    judge never reads a non-plate Hangul as readable, so such samples could never be exact.
+    """
+    kept = {k: v for k, v in labels.items() if PLATE_RE.match(v)}
+    return kept, sorted(set(labels) - set(kept))
+
+
 def list_images(folder):
     return sorted(p for p in Path(folder).iterdir() if p.suffix.lower() in {".png", ".jpg", ".jpeg"})
 
@@ -166,7 +176,9 @@ def make_row(test, image, variant, width, plate_w, vehicles, label, read, ms):
 def crop_test(samples, labels, widths, only=None):
     """OCR only: shrink each hand crop to the plate width, degrade, read. only: variant names to run."""
     rows = []
-    for i, path in enumerate(list_images(samples / "crops")):
+    for i, path in enumerate(list_images(samples / "crops")):  # i keeps the noise seeds when samples are skipped
+        if path.stem not in labels:
+            continue
         crop, label = load_png(path), labels[path.stem]
         for width in widths:
             if crop.shape[1] < WIDTH_TOL * width:
@@ -192,6 +204,8 @@ def frame_test(samples, labels, widths, out, only=None):
     """
     rows, crops = [], out / "size_frame"
     for i, path in enumerate(list_images(samples / "full")):
+        if path.stem not in labels:
+            continue
         photo, label = load_png(path), labels[path.stem]
         ref = detect_plates(photo, cond="ref", frame_id=path.stem, results_dir=crops)
         if not ref:
@@ -300,7 +314,9 @@ def main():
     ap.add_argument("--reuse", action="store_true", help="print the tables from size_<test>.csv without reading again")
     args = ap.parse_args()
     out = args.out or args.samples / "out"
-    labels = read_labels(args.samples / "labels.csv")
+    labels, skipped = real_plates(read_labels(args.samples / "labels.csv"))
+    if skipped:
+        print(f"skipped {len(skipped)} samples whose label is not a real plate: {', '.join(skipped)}", file=sys.stderr)
 
     summary = []
     for test in args.test:
