@@ -36,3 +36,18 @@ def test_small_cli_report_has_no_1080p_claim(tmp_path):
     assert len(report["environment"]["source_sha256"]) == 3
     for row in report["results"].values():
         assert row["target_met"] is None and not row["target_applicable"]
+
+
+def test_real_png_is_not_resized_and_is_distinguished_from_synthetic(tmp_path):
+    from src.io import save_frame
+    image, report_path = tmp_path / "input.png", tmp_path / "report.json"
+    frame = np.full((5, 9, 3), 40, np.uint8)
+    save_frame(image, frame)
+    bench.main(["--image", str(image), "--width", "100", "--height", "100",
+                "--warmups", "0", "--repeats", "1", "--cases", "median3",
+                "--output", str(report_path)])
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["input"]["shape"] == [5, 9, 3]
+    assert report["input"]["kind"] == "real_png"
+    assert report["input"]["filename"] == "input.png"
+    assert report["results"]["median3"]["target_met"] is None

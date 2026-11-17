@@ -85,6 +85,8 @@ def main(argv=None):
     parser.add_argument("--image", help="Real PNG input; never resized. Relative to project root.")
     parser.add_argument("--output", default="results/benchmarks/dip.json")
     args = parser.parse_args(argv)
+    if args.warmups < 0 or args.repeats < 1:
+        parser.error("warmups must be nonnegative and repeats positive")
     if args.width < 1 or args.height < 1 or args.seed < 0:
         parser.error("width/height must be positive and seed nonnegative")
     target = Path(args.output)
