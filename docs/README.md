@@ -19,5 +19,6 @@
 | C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: `summary.csv` per condition, proposed `score.csv` format | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
 | C-11: better and worse frames between conditions, worse-case list | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
+| Plate size and degradation limits, guideline for picking timestamps | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.

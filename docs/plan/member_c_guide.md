@@ -170,7 +170,7 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR d
 | --- | --- | --- | --- |
 | OCR reads 3 or fewer of 10 | 11/8–11/9, C-01 | Try another OCR; if still bad, focus on char accuracy | Did not happen: PaddleOCR 7/10 (EasyOCR 3/10 was dropped) |
 | Plate detector misses Korean plates | 11/10–11/12, C-03 | Own edge and ratio search in vehicle boxes; else labeled boxes + OCR only | Own search used: plate in top 3 for 10/10 |
-| Dashcam plates too small | 11/16, original results | Pick timestamps with bigger plates, ask B to add them | Unknown until frames arrive |
+| Dashcam plates too small | 11/17 on shrunk photos, then original results | Pick timestamps with bigger plates, ask B to add them | Measured ([plate_size_check.md](../plate_size_check.md)): read well from 80 px wide, Hangul lost below that, nothing below 40 px. Guideline: plates ≥ 80 px in 1920×1080. Real frames still to check |
 | Install or GPU problems | 11/8 | CPU and small (n) models | CPU works. On one PC: `pandas==2.2.3`, `chardet==5.2.0` (Windows Application Control), `enable_mkldnn=False` (PaddlePaddle 3.3 CPU), antivirus HTTPS scanning needs the OS cert store |
 | Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Happening: no schema in the repo; eval, aggregation and comparison done with fake files (#16, #24, #26) |
 
