@@ -63,8 +63,13 @@ def benchmark_frame(frame, *, warmups=2, repeats=5, cases=None):
 
 
 def environment():
-    commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
-                            capture_output=True, text=True, check=True).stdout.strip()
+    # Exported source ZIPs may have neither git nor .git; hashes still identify code.
+    try:
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
+                                capture_output=True, text=True, check=False)
+        commit = result.stdout.strip() if result.returncode == 0 else None
+    except OSError:
+        commit = None
     return {
         "python": platform.python_version(), "numpy": np.__version__,
         "platform": platform.platform(), "processor": platform.processor(),
@@ -99,7 +104,7 @@ def main(argv=None):
         if source.suffix.lower() != ".png":
             parser.error("image must be a PNG file")
         frame = load_frame(source)
-        provenance = {"kind": "real_png", "filename": source.name}
+        provenance = {"kind": "png_file", "filename": source.name}
     else:
         frame = np.random.default_rng(args.seed).integers(0, 256, (args.height, args.width, 3), dtype=np.uint8)
         provenance = {"kind": "synthetic_uniform_uint8", "seed": args.seed}
