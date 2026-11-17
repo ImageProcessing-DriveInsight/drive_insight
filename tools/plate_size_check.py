@@ -118,12 +118,17 @@ ENHANCED = {  # frame test only: A's merged ops on a degraded frame (a preview, 
 }
 
 
+def center_box(shape, size=FRAME_SIZE):
+    """(y, x, h, w) of an image of this shape placed in the middle of an (H, W) frame."""
+    H, W = size
+    h, w = min(shape[0], H), min(shape[1], W)
+    return (H - h) // 2, (W - w) // 2, h, w
+
+
 def paste_center(img, size=FRAME_SIZE, fill=FILL):
     """Put img in the middle of an (H, W) frame, cutting its borders if it is larger."""
-    H, W = size
-    h, w = min(img.shape[0], H), min(img.shape[1], W)
-    frame = np.full((H, W, 3), fill, np.uint8)
-    y, x = (H - h) // 2, (W - w) // 2
+    y, x, h, w = center_box(img.shape, size)
+    frame = np.full((*size, 3), fill, np.uint8)
     sy, sx = (img.shape[0] - h) // 2, (img.shape[1] - w) // 2
     frame[y:y + h, x:x + w] = img[sy:sy + h, sx:sx + w]
     return frame
@@ -158,8 +163,8 @@ def make_row(test, image, variant, width, plate_w, vehicles, label, read, ms):
             "char_acc": acc, "exact": text == label, "ms": ms}
 
 
-def crop_test(samples, labels, widths):
-    """OCR only: shrink each hand crop to the plate width, degrade, read."""
+def crop_test(samples, labels, widths, only=None):
+    """OCR only: shrink each hand crop to the plate width, degrade, read. only: variant names to run."""
     rows = []
     for i, path in enumerate(list_images(samples / "crops")):
         crop, label = load_png(path), labels[path.stem]
@@ -168,6 +173,8 @@ def crop_test(samples, labels, widths):
                 continue
             small = shrink(crop, width / crop.shape[1])
             for d, (variant, degrade) in enumerate(DEGRADATIONS.items()):
+                if only and variant not in only:
+                    continue
                 img = jpeg(degrade(small, np.random.default_rng([SEED, i, width, d])))
                 t = time.perf_counter()
                 status, text, conf = read_plate(img)
@@ -178,8 +185,11 @@ def crop_test(samples, labels, widths):
     return rows
 
 
-def frame_test(samples, labels, widths, out):
-    """Full pipeline: shrink the photo so its plate is `width` px, paste on a frame, degrade, detect and read."""
+def frame_test(samples, labels, widths, out, only=None):
+    """Full pipeline: shrink the photo so its plate is `width` px, paste on a frame, degrade, detect and read.
+
+    only: variant names to run. A's ops see only the photo: the flat border would dominate the histogram.
+    """
     rows, crops = [], out / "size_frame"
     for i, path in enumerate(list_images(samples / "full")):
         photo, label = load_png(path), labels[path.stem]
@@ -193,12 +203,15 @@ def frame_test(samples, labels, widths, out):
             if native < WIDTH_TOL * width:
                 continue
             scale = min(1.0, width / native)
-            canvas = paste_center(shrink(photo, scale))
+            small = shrink(photo, scale)
+            canvas, (y, x, h, w) = paste_center(small), center_box(small.shape)
             for variant, (base, enhance) in variants.items():
+                if only and variant not in only:
+                    continue
                 rng = np.random.default_rng([SEED, i, width, list(DEGRADATIONS).index(base)])
                 frame = jpeg(DEGRADATIONS[base](canvas, rng))  # enhanced variants reuse the same degraded frame
                 if enhance:
-                    frame = enhance(frame)
+                    frame[y:y + h, x:x + w] = enhance(frame[y:y + h, x:x + w])
                 t = time.perf_counter()
                 vehicles = len(detect_vehicles(frame))
                 plates = detect_plates(frame, cond=variant, frame_id=f"{path.stem}_{width}", results_dir=crops)
@@ -283,6 +296,7 @@ def main():
     ap.add_argument("--test", nargs="+", choices=["crop", "frame"], default=["crop", "frame"])
     ap.add_argument("--widths", nargs="+", type=int, default=list(WIDTHS))
     ap.add_argument("--out", type=Path, help="output folder, default <samples>/out")
+    ap.add_argument("--variants", nargs="+", help="run only these variants, e.g. clean fog+hist_eq")
     ap.add_argument("--reuse", action="store_true", help="print the tables from size_<test>.csv without reading again")
     args = ap.parse_args()
     out = args.out or args.samples / "out"
@@ -293,8 +307,8 @@ def main():
         if args.reuse:
             rows = load_rows(out / f"size_{test}.csv")
         else:
-            rows = crop_test(args.samples, labels, args.widths) if test == "crop" else \
-                frame_test(args.samples, labels, args.widths, out)
+            rows = crop_test(args.samples, labels, args.widths, args.variants) if test == "crop" else \
+                frame_test(args.samples, labels, args.widths, out, args.variants)
             write_rows(out / f"size_{test}.csv", ROW_COLUMNS, rows)
             write_rows(out / f"size_{test}_summary.csv", SUMMARY_COLUMNS, summarize(rows))
         summary += summarize(rows)

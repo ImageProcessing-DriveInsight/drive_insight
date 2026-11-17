@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from tools.plate_size_check import (ROW_COLUMNS, area_weights, best_read, fog, jpeg, load_rows, low_light, make_row,
-                                    motion_blur, paste_center, read_labels, shrink, summarize, write_rows)
+from tools.plate_size_check import (ROW_COLUMNS, area_weights, best_read, center_box, fog, jpeg, load_rows, low_light,
+                                    make_row, motion_blur, paste_center, read_labels, shrink, summarize, write_rows)
 
 
 def test_area_weights_rows_are_means():
@@ -52,6 +52,7 @@ def test_jpeg_and_paste_center():
     img = np.full((20, 30, 3), 128, np.uint8)
     assert np.abs(jpeg(img).astype(int) - 128).max() <= 2
     frame = paste_center(img, size=(40, 50), fill=0)
+    assert center_box(img.shape, size=(40, 50)) == (10, 10, 20, 30)
     assert frame.shape == (40, 50, 3)
     assert (frame[10:30, 10:40] == 128).all() and frame.sum() == img.sum()
     big = paste_center(np.full((60, 70, 3), 5, np.uint8), size=(40, 50))
