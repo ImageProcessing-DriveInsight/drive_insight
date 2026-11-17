@@ -19,5 +19,6 @@
 | C-09: 평가 지표와 번호판 라벨 형식 제안 | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: 조건별 `summary.csv`, `score.csv` 형식 제안 | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
 | C-11: 조건 간 개선·악화 프레임, 악화 사례 목록 | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
+| 번호판 크기·화질 한계, 타임스탬프 선정 기준 | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
 
 계획 문서는 2026-11-16 기준 저장소 상태를 반영합니다.
