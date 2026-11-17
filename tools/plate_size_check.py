@@ -1,0 +1,273 @@
+"""Plate size and degradation check: how small and how degraded can a plate be and still be read?
+
+Each sample is shrunk so its plate is W px wide (area averaging, like a camera
+farther away), degraded, JPEG-compressed like a video frame, then read:
+
+  crop   hand crops -> read_plate (preprocess -> OCR -> judge): reading only.
+  frame  full photos pasted on a 1920x1080 frame -> detect_plates (vehicle ->
+         plate candidates -> read). Also runs A's gamma and hist_eq on the fog
+         and low-light frames.
+
+Degradations (NumPy, seeded): clean, fog (I = J t + A (1 - t)), low light
+(I = J k + sensor noise), blur (horizontal motion blur).
+
+Uses the sample folder of tools/model_check.py (full/, crops/, labels.csv).
+Writes <out>/size_<test>.csv (one row per image and variant, with plate text)
+and <out>/size_<test>_summary.csv (counts only), and prints the summary.
+
+Usage:
+    python tools/plate_size_check.py <samples> [--test crop frame] [--widths 120 80 40] [--out DIR]
+"""
+
+import argparse
+import csv
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from src.dip import gamma, hist_eq  # noqa: E402
+from src.eval.ocr import char_accuracy  # noqa: E402
+from src.plate.detect import STATUS_RANK, detect_plates, detect_vehicles, read_plate  # noqa: E402
+from src.plate.imgutil import load_png  # noqa: E402
+
+WIDTHS = (120, 100, 80, 60, 50, 40, 30, 25, 20)  # target plate width in px
+FRAME_SIZE = (1080, 1920)  # (H, W) of a dashcam frame
+FILL = 114  # gray around the pasted photo
+JPEG_QUALITY = 75
+FOG_T, FOG_AIRLIGHT = 0.4, 220.0  # plate contrast drops to 40 %, toward light gray
+DARK_K, DARK_NOISE = 0.2, 3.0  # 20 % exposure, noise std in gray levels
+BLUR_LEN = 5  # motion blur length in frame px
+SEED = 0
+
+ROW_COLUMNS = ["test", "image", "variant", "width", "plate_w", "vehicles", "label", "text", "status", "conf",
+               "char_acc", "exact", "ms"]
+SUMMARY_COLUMNS = ["test", "variant", "width", "n", "exact", "char_acc", "readable", "readable_wrong", "uncertain",
+                   "unreadable", "missed", "vehicles_found"]
+
+
+def to_u8(a):
+    return np.clip(np.rint(a), 0, 255).astype(np.uint8)
+
+
+def area_weights(n_in, n_out):
+    """(n_out, n_in) matrix: each output pixel is the mean of the input pixels it covers."""
+    edges = np.arange(n_out + 1) * (n_in / n_out)
+    j = np.arange(n_in)
+    overlap = np.clip(np.minimum(edges[1:, None], j + 1) - np.maximum(edges[:-1, None], j), 0, None)
+    return overlap / overlap.sum(1, keepdims=True)
+
+
+def shrink(img, scale):
+    """Area-average downscale of a gray or color image; scale >= 1 returns a copy."""
+    if scale >= 1:
+        return img.copy()
+    h, w = img.shape[:2]
+    wy = area_weights(h, max(1, round(h * scale)))
+    wx = area_weights(w, max(1, round(w * scale)))
+    out = np.tensordot(wy, img.astype(np.float64), axes=(1, 0))  # (h', w[, c])
+    out = np.tensordot(out, wx, axes=(1, 1))  # (h'[, c], w')
+    return to_u8(np.moveaxis(out, -1, 1))
+
+
+def fog(img, t=FOG_T, airlight=FOG_AIRLIGHT):
+    """Haze model I = J t + A (1 - t), one transmission t for the whole image."""
+    return to_u8(img * t + airlight * (1 - t))
+
+
+def low_light(img, k=DARK_K, noise=DARK_NOISE, rng=None):
+    """Underexposure I = J k plus Gaussian sensor noise."""
+    rng = rng if rng is not None else np.random.default_rng(SEED)
+    return to_u8(img * k + rng.normal(0.0, noise, img.shape))
+
+
+def motion_blur(img, length=BLUR_LEN):
+    """Horizontal motion blur: mean of `length` neighboring pixels, edge padded."""
+    if length <= 1:
+        return img.copy()
+    left = (length - 1) // 2
+    pad = [(0, 0), (left, length - 1 - left)] + [(0, 0)] * (img.ndim - 2)
+    c = np.cumsum(np.pad(img.astype(np.float64), pad, mode="edge"), axis=1)
+    c = np.concatenate([np.zeros_like(c[:, :1]), c], axis=1)
+    return to_u8((c[:, length:] - c[:, :-length]) / length)
+
+
+def jpeg(img, quality=JPEG_QUALITY):
+    """Encode and decode as JPEG, like a compressed video frame."""
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        raise ValueError("cannot encode JPEG")
+    return cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+
+
+DEGRADATIONS = {
+    "clean": lambda img, rng: img,
+    "fog": lambda img, rng: fog(img),
+    "low_light": lambda img, rng: low_light(img, rng=rng),
+    "blur": lambda img, rng: motion_blur(img),
+}
+ENHANCED = {  # frame test only: A's merged ops on a degraded frame (a preview, not A's fixed pipeline)
+    "fog+hist_eq": ("fog", hist_eq),
+    "low_light+gamma+hist_eq": ("low_light", lambda img: hist_eq(gamma(img, 0.5))),
+}
+
+
+def paste_center(img, size=FRAME_SIZE, fill=FILL):
+    """Put img in the middle of an (H, W) frame, cutting its borders if it is larger."""
+    H, W = size
+    h, w = min(img.shape[0], H), min(img.shape[1], W)
+    frame = np.full((H, W, 3), fill, np.uint8)
+    y, x = (H - h) // 2, (W - w) // 2
+    sy, sx = (img.shape[0] - h) // 2, (img.shape[1] - w) // 2
+    frame[y:y + h, x:x + w] = img[sy:sy + h, sx:sx + w]
+    return frame
+
+
+def best_read(plates, label):
+    """The returned plate closest to the label: (text, status, conf, char_acc), status 'missed' if none."""
+    if not plates:
+        return None, "missed", 0.0, 0.0
+    p = max(plates, key=lambda p: (char_accuracy(p["text"], label), STATUS_RANK[p["status"]]))
+    return p["text"], p["status"], p["conf"], char_accuracy(p["text"], label)
+
+
+def read_labels(path):
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return {Path(r["file"]).stem: r["text"] for r in csv.DictReader(f)}
+
+
+def list_images(folder):
+    return sorted(p for p in Path(folder).iterdir() if p.suffix.lower() in {".png", ".jpg", ".jpeg"})
+
+
+def make_row(test, image, variant, width, plate_w, vehicles, label, read, ms):
+    text, status, conf, acc = read
+    return {"test": test, "image": image, "variant": variant, "width": width, "plate_w": plate_w,
+            "vehicles": vehicles, "label": label, "text": text, "status": status, "conf": conf,
+            "char_acc": acc, "exact": text == label, "ms": ms}
+
+
+def crop_test(samples, labels, widths):
+    """OCR only: shrink each hand crop to the plate width, degrade, read."""
+    rows = []
+    for i, path in enumerate(list_images(samples / "crops")):
+        crop, label = load_png(path), labels[path.stem]
+        for width in widths:
+            small = shrink(crop, width / crop.shape[1])
+            for d, (variant, degrade) in enumerate(DEGRADATIONS.items()):
+                img = jpeg(degrade(small, np.random.default_rng([SEED, i, width, d])))
+                t = time.perf_counter()
+                status, text, conf = read_plate(img)
+                ms = (time.perf_counter() - t) * 1000
+                read = (text, status, conf, char_accuracy(text, label))
+                rows.append(make_row("crop", path.stem, variant, width, small.shape[1], None, label, read, ms))
+        print(f"crop {path.stem} done", file=sys.stderr, flush=True)
+    return rows
+
+
+def frame_test(samples, labels, widths, out):
+    """Full pipeline: shrink the photo so its plate is `width` px, paste on a frame, degrade, detect and read."""
+    rows, crops = [], out / "size_frame"
+    for i, path in enumerate(list_images(samples / "full")):
+        photo, label = load_png(path), labels[path.stem]
+        ref = detect_plates(photo, cond="ref", frame_id=path.stem, results_dir=crops)
+        if not ref:
+            print(f"frame {path.stem}: no plate in the full photo, skipped", file=sys.stderr)
+            continue
+        native = max(ref, key=lambda p: char_accuracy(p["text"], label))["bbox"][2]  # plate width in the photo
+        variants = {**{v: (v, None) for v in DEGRADATIONS}, **ENHANCED}
+        for width in widths:
+            scale = min(1.0, width / native)
+            canvas = paste_center(shrink(photo, scale))
+            for variant, (base, enhance) in variants.items():
+                rng = np.random.default_rng([SEED, i, width, list(DEGRADATIONS).index(base)])
+                frame = jpeg(DEGRADATIONS[base](canvas, rng))  # enhanced variants reuse the same degraded frame
+                if enhance:
+                    frame = enhance(frame)
+                t = time.perf_counter()
+                vehicles = len(detect_vehicles(frame))
+                plates = detect_plates(frame, cond=variant, frame_id=f"{path.stem}_{width}", results_dir=crops)
+                ms = (time.perf_counter() - t) * 1000
+                rows.append(make_row("frame", path.stem, variant, width, round(native * scale), vehicles, label,
+                                     best_read(plates, label), ms))
+        print(f"frame {path.stem} done (plate {native} px in the photo)", file=sys.stderr, flush=True)
+    return rows
+
+
+def summarize(rows):
+    """One row per (test, variant, width), in first-seen order."""
+    groups = {}
+    for r in rows:
+        groups.setdefault((r["test"], r["variant"], r["width"]), []).append(r)
+    out = []
+    for (test, variant, width), g in groups.items():
+        status = [r["status"] for r in g]
+        out.append({
+            "test": test, "variant": variant, "width": width, "n": len(g),
+            "exact": sum(r["exact"] for r in g),
+            "char_acc": sum(r["char_acc"] for r in g) / len(g),
+            "readable": status.count("readable"),
+            "readable_wrong": sum(r["status"] == "readable" and not r["exact"] for r in g),
+            "uncertain": status.count("uncertain"),
+            "unreadable": status.count("unreadable"),
+            "missed": status.count("missed"),
+            "vehicles_found": sum(r["vehicles"] > 0 for r in g) if test == "frame" else None,
+        })
+    return out
+
+
+def write_rows(path, columns, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=columns)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: "" if r[k] is None else round(r[k], 4) if isinstance(r[k], float) else r[k]
+                             for k in columns})
+    return path
+
+
+def print_tables(summary, widths):
+    """Markdown tables, one row per variant: exact reads (wrong readable reads in brackets)."""
+    for test in dict.fromkeys(s["test"] for s in summary):
+        cells = {(s["variant"], s["width"]): s for s in summary if s["test"] == test}
+        print(f"\n{test}: exact / n, [readable but wrong]" + (", {vehicles found}" if test == "frame" else ""))
+        print("| variant | " + " | ".join(f"{w} px" for w in widths) + " |")
+        print("| --- |" + " --- |" * len(widths))
+        for variant in dict.fromkeys(v for v, _ in cells):
+            parts = []
+            for w in widths:
+                s = cells[(variant, w)]
+                cell = f"{s['exact']}/{s['n']}"
+                cell += f" [{s['readable_wrong']}]" if s["readable_wrong"] else ""
+                cell += f" {{{s['vehicles_found']}}}" if test == "frame" and s["vehicles_found"] < s["n"] else ""
+                parts.append(cell)
+            print(f"| {variant} | " + " | ".join(parts) + " |")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("samples", type=Path, help="sample folder with full/, crops/ and labels.csv")
+    ap.add_argument("--test", nargs="+", choices=["crop", "frame"], default=["crop", "frame"])
+    ap.add_argument("--widths", nargs="+", type=int, default=list(WIDTHS))
+    ap.add_argument("--out", type=Path, help="output folder, default <samples>/out")
+    args = ap.parse_args()
+    out = args.out or args.samples / "out"
+    labels = read_labels(args.samples / "labels.csv")
+
+    summary = []
+    for test in args.test:
+        rows = crop_test(args.samples, labels, args.widths) if test == "crop" else \
+            frame_test(args.samples, labels, args.widths, out)
+        write_rows(out / f"size_{test}.csv", ROW_COLUMNS, rows)
+        summary += summarize(rows)
+        write_rows(out / f"size_{test}_summary.csv", SUMMARY_COLUMNS, summarize(rows))
+    print_tables(summary, args.widths)
+
+
+if __name__ == "__main__":
+    main()
