@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-17T11:49:03.436957+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+    "logical_cpus": 16,
+    "commit": "848063836ad82a7038db08408ea9023da82d93f9",
+    "source_sha256": {
+      "src/dip/ops.py": "35c562f30c9e9f4d998d94685b960067614a0516c07fa699291628cc477c20dd",
+      "src/dip/color.py": "84ff6cd0f4ee6877bc8116dd65b9d78c2739ebfed8437688b8bec6252975d5e1",
+      "src/dip/fixed.py": "835e13882622db3917c5b73b293c9b7c2838938e09d28561c462e71872175da6"
+    }
+  },
+  "input": {
+    "kind": "synthetic_uniform_uint8",
+    "seed": 29,
+    "shape": [
+      1080,
+      1920,
+      3
+    ],
+    "dtype": "uint8",
+    "pixel_sha256": "16dc6b4ca46c1e4973a5f9556017a72be00c63d8020a1927c090052b38535f21"
+  },
+  "warmups": 2,
+  "repeats": 5,
+  "timing_scope": "operation call including output disposal; excluding input generation, decoding and JSON IO",
+  "target_rule": "1080p median <= target; p95 is reported separately",
+  "results": {
+    "gaussian3": {
+      "params": {
+        "ksize": 3,
+        "sigma": 1.0
+      },
+      "samples_ms": [
+        162.90090000256896,
+        144.63550003711134,
+        131.36800000211224,
+        156.54639998683706,
+        232.62810002779588
+      ],
+      "median_ms": 156.54639998683706,
+      "p95_ms": 218.6826600227505,
+      "target_ms": 500.0,
+      "target_applicable": true,
+      "target_met": true
+    },
+    "gaussian5": {
+      "params": {
+        "ksize": 5,
+        "sigma": 1.0
+      },
+      "samples_ms": [
+        194.74270002683625,
+        179.01909997453913,
+        182.6038000290282,
+        197.5722999777645,
+        188.4750999743119
+      ],
+      "median_ms": 188.4750999743119,
+      "p95_ms": 197.00637998757884,
+      "target_ms": 500.0,
+      "target_applicable": true,
+      "target_met": true
+    },
+    "gaussian9": {
+      "params": {
+        "ksize": 9,
+        "sigma": 1.5
+      },
+      "samples_ms": [
+        216.65090002352372,
+        193.1330999941565,
+        198.05460004135966,
+        190.2598000015132,
+        189.12239995552227
+      ],
+      "median_ms": 193.1330999941565,
+      "p95_ms": 212.9316400270909,
+      "target_ms": 500.0,
+      "target_applicable": true,
+      "target_met": true
+    },
+    "median3": {
+      "params": {
+        "ksize": 3
+      },
+      "samples_ms": [
+        672.528599970974,
+        683.9747999911197,
+        614.9675999768078,
+        682.8802999807522,
+        667.4281999585219
+      ],
+      "median_ms": 672.528599970974,
+      "p95_ms": 683.7558999890462,
+      "target_ms": 1500.0,
+      "target_applicable": true,
+      "target_met": true
+    },
+    "median5": {
+      "params": {
+        "ksize": 5
+      },
+      "samples_ms": [
+        980.5454000015743,
+        996.1151000461541,
+        1091.3883000030182,
+        1079.1332999942824,
+        1048.4845000319183
+      ],
+      "median_ms": 1048.4845000319183,
+      "p95_ms": 1088.937300001271,
+      "target_ms": 1500.0,
+      "target_applicable": true,
+      "target_met": true
+    },
+    "fixed": {
+      "params": {
+        "denoise": "gaussian",
+        "ksize": 3,
+        "sigma": 1.0,
+        "gamma": 0.75,
+        "hist_eq": false,
+        "unsharp": 0.8,
+        "unsharp_sigma": 1.0,
+        "unsharp_threshold": 5.0
+      },
+      "samples_ms": [
+        868.8894999795593,
+        976.3372000306845,
+        831.5994000295177,
+        999.4500000029802,
+        825.2294000121765
+      ],
+      "median_ms": 868.8894999795593,
+      "p95_ms": 994.8274400085211,
+      "target_ms": 2000.0,
+      "target_applicable": true,
+      "target_met": true
+    }
+  }
+}

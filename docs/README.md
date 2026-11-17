@@ -16,6 +16,7 @@
 | --- | --- | --- |
 | A-01 to A-09: parameters, decisions, experiments, performance and integration | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
 | A-09: fixed PNG batches, JSON logs and failure recovery | — | [fixed_batch.ko.md](fixed_batch.ko.md) |
+| A-10: repeatable benchmarks, speedups, memory and concurrency decisions | — | [dip_performance.ko.md](dip_performance.ko.md) |
 | C-01: detector and OCR comparison, versions, licenses | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
