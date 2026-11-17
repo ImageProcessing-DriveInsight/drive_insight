@@ -111,7 +111,12 @@ def test_contrast_and_sharpness_boundaries():
 
 def test_rule_document_matches_code():
     import re
-    doc=Path('docs/rules.md').read_text()
-    expected=set(re.findall(r"append\('([A-Z_]+)'\)",Path('src/adaptive/rules.py').read_text()))
-    documented=set(re.findall(r'\| ([A-Z]+_[A-Z]+) \|',doc))
-    assert documented==expected
+
+    root = Path(__file__).resolve().parents[1]
+    doc = (root / 'docs/rules.md').read_text(encoding='utf-8')
+    code = (root / 'src/adaptive/rules.py').read_text(encoding='utf-8')
+
+    expected = set(re.findall(r"append\('([A-Z_]+)'\)", code))
+    documented = set(re.findall(r'\| ([A-Z]+_[A-Z]+) \|', doc))
+
+    assert documented == expected
