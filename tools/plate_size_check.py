@@ -136,8 +136,13 @@ def best_read(plates, label):
 
 
 def read_labels(path):
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        return {Path(r["file"]).stem: r["text"] for r in csv.DictReader(f)}
+    for enc in ("utf-8-sig", "cp949"):  # Excel on Korean Windows saves cp949
+        try:
+            with open(path, encoding=enc, newline="") as f:
+                return {Path(r["file"].strip()).stem: r["text"].strip() for r in csv.DictReader(f)}
+        except UnicodeDecodeError:
+            continue
+    raise ValueError(f"cannot decode {path}")
 
 
 def list_images(folder):
@@ -231,22 +236,39 @@ def write_rows(path, columns, rows):
     return path
 
 
+def load_rows(path):
+    """Read back a size_<test>.csv written by write_rows."""
+    with open(path, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        r["width"], r["char_acc"], r["exact"] = int(r["width"]), float(r["char_acc"]), r["exact"] == "True"
+        r["vehicles"] = int(r["vehicles"]) if r["vehicles"] else None
+    return rows
+
+
+TABLES = {
+    "exact / n, [readable but wrong]":
+        lambda s: f"{s['exact']}/{s['n']}" + (f" [{s['readable_wrong']}]" if s["readable_wrong"] else ""),
+    "mean char accuracy": lambda s: f"{s['char_acc']:.2f}",
+    "readable / uncertain / unreadable or missed":
+        lambda s: f"{s['readable']}/{s['uncertain']}/{s['unreadable'] + s['missed']}",
+    "frames with a vehicle found": lambda s: f"{s['vehicles_found']}/{s['n']}",
+}
+
+
 def print_tables(summary, widths):
-    """Markdown tables, one row per variant: exact reads (wrong readable reads in brackets)."""
+    """Markdown tables per test: one row per variant, one column per plate width."""
     for test in dict.fromkeys(s["test"] for s in summary):
         cells = {(s["variant"], s["width"]): s for s in summary if s["test"] == test}
-        print(f"\n{test}: exact / n, [readable but wrong]" + (", {vehicles found}" if test == "frame" else ""))
-        print("| variant | " + " | ".join(f"{w} px" for w in widths) + " |")
-        print("| --- |" + " --- |" * len(widths))
-        for variant in dict.fromkeys(v for v, _ in cells):
-            parts = []
-            for w in widths:
-                s = cells[(variant, w)]
-                cell = f"{s['exact']}/{s['n']}"
-                cell += f" [{s['readable_wrong']}]" if s["readable_wrong"] else ""
-                cell += f" {{{s['vehicles_found']}}}" if test == "frame" and s["vehicles_found"] < s["n"] else ""
-                parts.append(cell)
-            print(f"| {variant} | " + " | ".join(parts) + " |")
+        variants = list(dict.fromkeys(v for v, _ in cells))
+        for title, fmt in TABLES.items():
+            if title.startswith("frames") and test != "frame":
+                continue
+            print(f"\n{test}: {title}")
+            print("| variant | " + " | ".join(f"{w} px" for w in widths) + " |")
+            print("| --- |" + " --- |" * len(widths))
+            for v in variants:
+                print(f"| {v} | " + " | ".join(fmt(cells[(v, w)]) if (v, w) in cells else "" for w in widths) + " |")
 
 
 def main():
@@ -255,17 +277,21 @@ def main():
     ap.add_argument("--test", nargs="+", choices=["crop", "frame"], default=["crop", "frame"])
     ap.add_argument("--widths", nargs="+", type=int, default=list(WIDTHS))
     ap.add_argument("--out", type=Path, help="output folder, default <samples>/out")
+    ap.add_argument("--reuse", action="store_true", help="print the tables from size_<test>.csv without reading again")
     args = ap.parse_args()
     out = args.out or args.samples / "out"
     labels = read_labels(args.samples / "labels.csv")
 
     summary = []
     for test in args.test:
-        rows = crop_test(args.samples, labels, args.widths) if test == "crop" else \
-            frame_test(args.samples, labels, args.widths, out)
-        write_rows(out / f"size_{test}.csv", ROW_COLUMNS, rows)
+        if args.reuse:
+            rows = load_rows(out / f"size_{test}.csv")
+        else:
+            rows = crop_test(args.samples, labels, args.widths) if test == "crop" else \
+                frame_test(args.samples, labels, args.widths, out)
+            write_rows(out / f"size_{test}.csv", ROW_COLUMNS, rows)
+            write_rows(out / f"size_{test}_summary.csv", SUMMARY_COLUMNS, summarize(rows))
         summary += summarize(rows)
-        write_rows(out / f"size_{test}_summary.csv", SUMMARY_COLUMNS, summarize(rows))
     print_tables(summary, args.widths)
 
 
