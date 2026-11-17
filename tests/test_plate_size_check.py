@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from tools.plate_size_check import (area_weights, best_read, fog, jpeg, low_light, motion_blur, paste_center, shrink,
-                                    summarize)
+from tools.plate_size_check import (ROW_COLUMNS, area_weights, best_read, fog, jpeg, load_rows, low_light, make_row,
+                                    motion_blur, paste_center, read_labels, shrink, summarize, write_rows)
 
 
 def test_area_weights_rows_are_means():
@@ -76,3 +76,16 @@ def test_best_read_and_summary():
         (60, 3, 1, 2, 1, 1)
     assert s60["char_acc"] == pytest.approx(2 / 3) and s60["vehicles_found"] == 2
     assert (s30["n"], s30["exact"], s30["vehicles_found"]) == (1, 0, 0)
+
+
+def test_rows_round_trip(tmp_path):
+    rows = [make_row("crop", "a", "fog", 60, 58, None, "12가3456", ("12가3456", "readable", 0.91, 1.0), 300.0),
+            make_row("frame", "a", "clean", 40, 41, 2, "12가3456", (None, "missed", 0.0, 0.0), 900.0)]
+    path = write_rows(tmp_path / "size.csv", ROW_COLUMNS, rows)
+    assert summarize(load_rows(path)) == summarize(rows)
+
+
+def test_read_labels_cp949(tmp_path):
+    path = tmp_path / "labels.csv"
+    path.write_bytes("file,text\na.png,12가3456\n".encode("cp949"))
+    assert read_labels(path) == {"a": "12가3456"}
