@@ -38,7 +38,7 @@ def test_small_cli_report_has_no_1080p_claim(tmp_path):
         assert row["target_met"] is None and not row["target_applicable"]
 
 
-def test_real_png_is_not_resized_and_is_distinguished_from_synthetic(tmp_path):
+def test_png_is_not_resized_and_is_distinguished_from_generated_input(tmp_path):
     from src.io import save_frame
     image, report_path = tmp_path / "input.png", tmp_path / "report.json"
     frame = np.full((5, 9, 3), 40, np.uint8)
@@ -48,6 +48,15 @@ def test_real_png_is_not_resized_and_is_distinguished_from_synthetic(tmp_path):
                 "--output", str(report_path)])
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["input"]["shape"] == [5, 9, 3]
-    assert report["input"]["kind"] == "real_png"
+    assert report["input"]["kind"] == "png_file"
     assert report["input"]["filename"] == "input.png"
     assert report["results"]["median3"]["target_met"] is None
+
+
+def test_environment_without_git_still_records_source_hashes(monkeypatch):
+    def missing_git(*args, **kwargs):
+        raise FileNotFoundError("git not installed")
+    monkeypatch.setattr(bench.subprocess, "run", missing_git)
+    info = bench.environment()
+    assert info["commit"] is None
+    assert len(info["source_sha256"]) == 3
