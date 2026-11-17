@@ -2,9 +2,11 @@
 
 기준: 2026-11-17. A-01~06은 PR [#30](https://github.com/ImageProcessing-DriveInsight/drive_insight/pull/30),
 apply_ops는 이슈 [#44](https://github.com/ImageProcessing-DriveInsight/drive_insight/issues/44)의 구현이다.
+fixed_enhance는 이슈 [#46](https://github.com/ImageProcessing-DriveInsight/drive_insight/issues/46)의 구현이다.
 이 문서는 팀 공유용이다. 로컬 작업 메모 `dip.md`와는 별개다.
 아래의 **현재 구현**, **명세 요구**, **미합의 제안**을 구분해서 읽는다.
-아직 FIXED_PARAMS나 적응형 규칙을 선정한 상태가 아니다.
+FIXED_PARAMS는 이슈 #46에서 초기 기준 설정을 정의했다. 실제 평가 영상으로 최적화한 최종 설정은 아니다.
+B의 적응형 규칙은 별도 규칙 문서에서 관리한다.
 
 ## 1. 현재 API와 입력 계약
 
@@ -165,8 +167,8 @@ CPU 모델·전원 모드·부하는 기록하지 않았으므로 정식 벤치�
 ### B: 적응형 보정과 영상 I/O
 
 - 현재 제공 가능: 기존 7개 연산과 `src.dip.fixed:apply_ops` (또는 `from src.dip import apply_ops`).
-  `fixed_enhance`와 `FIXED_PARAMS`는 **아직 미구현**이다.
-- 구현 계약: `apply_ops(frame, params) -> out`. 예정 계약: `fixed_enhance(frame) -> (out, params)`.
+  `src.dip.fixed:fixed_enhance`와 읽기 전용 `FIXED_PARAMS`도 제공한다.
+- 구현 계약: `apply_ops(frame, params) -> out`, `fixed_enhance(frame) -> (out, params)`.
 - 명세 순서: 노이즈 제거 → 감마 → 평활화 → Unsharp.
   키 누락은 해당 연산 생략, 모르는 키는 ValueError, `rules` 키는 무시한다.
 - 계획 문서의 `{"gamma":0.6,"denoise":"median","ksize":5,"unsharp":1.2,"rules":[...]}`는
@@ -205,7 +207,7 @@ python -m pytest -q
 
 - [ ] B와 params 형식, 기본값 및 Unsharp 세부 동작 합의
 - [x] apply_ops 구현과 순서·예외·빈 dict·B 연동 테스트 (이슈 #44)
-- [ ] fixed_enhance/FIXED_PARAMS 구현 및 테스트
+- [x] fixed_enhance/FIXED_PARAMS 구현 및 테스트 (이슈 #46, 초기 기준 설정)
 - [ ] 평가 프레임 확보 후 일괄 생성·로그·파일 목록 검증
 - [ ] 파라미터 실험과 채택/기각 근거 기록
 - [ ] 실제 영상의 색 테두리·halo·잡음·번호판 획 소실 확인
@@ -271,7 +273,7 @@ B의 이전 rules.md에는 "평활화 → 감마"가 제안되어 있었다.
 B의 규칙 임계값·규칙 ID·select_params 코드는 바꾸지 않았다.
 순서를 바꾸려면 A·B가 합의하고 비가환성 테스트, 튜닝 및 결과 생성을 함께 변경해야 한다.
 
-### 이번 범위의 완료·미완료
+### 이슈 #44 당시의 완료·미완료
 
 - A-07 실행기와 B의 실제 규칙/동적 호출/PNG 일괄 생성 연동 테스트를 추가했다.
 - A-08 fixed_enhance와 FIXED_PARAMS, A-09 고정 프레임 생성, A-10 성능 목표는 이번 범위가 아니다.
@@ -280,3 +282,69 @@ B의 규칙 임계값·규칙 ID·select_params 코드는 바꾸지 않았다.
 검증 기록(2026-11-17): 기존 연산+실행기 단위 테스트 316 passed,
 B 연동+기존 B 테스트 32 passed, 최종 전체 테스트 **429 passed, 2 skipped**.
 생략된 테스트는 기존 YOLO 가중치/실제 OCR 환경 의존 항목이며 실제 데이터 검증을 대체하지 않는다.
+
+## 8. fixed_enhance 초기 기준 설정 v0.1 (이슈 #46)
+
+```python
+import json
+from src.dip import FIXED_PARAMS, fixed_enhance
+
+out, params = fixed_enhance(frame)
+json_text = json.dumps(params, allow_nan=False)  # 반환값은 일반 dict
+assert params == dict(FIXED_PARAMS)
+```
+
+함수는 `params = dict(FIXED_PARAMS)`를 만든 뒤 `apply_ops(frame, params)`를 호출하고
+`(out, params)`를 반환한다. 입력은 기존과 같은 uint8 BGR이고 입력을 수정하지 않는다.
+매번 새로운 params dict를 반환하며 모든 프레임에서 값은 동일하다. 품질 측정이나 규칙 선택을 하지 않는다.
+사용자가 설정을 주입하는 인자를 추가하지 않았으므로 fixed 조건을 프레임별로 바꾸지 않는다.
+
+### 값의 출처와 선정 이유
+
+**아래 값은 구현자가 정한 초기 기준 설정이다. 실제 영상의 OCR·화질·속도 실험으로 선정한 최적값이 아니다.**
+모든 연산 값을 명시해 apply_ops의 기본값이 바뀌어도 fixed 설정이 암묵적으로 달라지지 않도록 했다.
+
+| 키 | 초기 고정값 | 선택 근거·주의점 |
+| --- | --- | --- |
+| denoise | `"gaussian"` | 작은 커널로 공간 잡음을 줄이는 출발점. Median 대비 실측 비용이 작았지만 품질 우위는 미검증 |
+| ksize | `3` | 허용 범위 중 가장 작은 커널로 흐림과 계산량을 제한하려는 선택 |
+| sigma | `1.0` | 기존 실행기 연동 기본값 재사용, 미튜닝 |
+| gamma | `0.75` | B의 BR_DIM 강도를 초기 기준으로 재사용. 0.5보다 약하게 밝히려는 선택이며 밝은 영상에도 동일 적용 |
+| hist_eq | `False` | 평활화의 강한 대비 변화·잡음 증폭을 피하는 초기 선택. 유리하다는 실험 근거는 없음 |
+| unsharp | `0.8` | B의 SH_LOW 강도를 초기 기준으로 재사용, 잡음 재증폭·halo·색 테두리 검증 필요 |
+| unsharp_sigma | `1.0` | 기존 실행기 기본값 재사용, 현재 내부 Gaussian 커널은 7×7 |
+| unsharp_threshold | `5.0` | 기존 실행기의 초기 잡음 억제값 재사용, 미튜닝 |
+
+실제 실행 순서는 Gaussian(3,1.0) → Y 감마(0.75) → Unsharp(0.8,1.0,5.0)이다.
+hist_eq=False이므로 평활화는 생략한다. denoise와 Unsharp에 각각 Gaussian이 호출되므로
+파이프라인 속도를 단일 Gaussian 측정값으로 대신 보고해서는 안 된다.
+이 초기 설정은 밝은 영상의 과노출, 세부 획 흐림, 샤프닝 아티팩트를 만들 수 있다.
+조건별 장단점은 동일한 평가 목록으로 보고하고, 프레임별로 설정을 바꾸어 fixed 결과를 유리하게 만들지 않는다.
+
+### 상수 보호·로그·호출 경로
+
+- `FIXED_PARAMS`는 `MappingProxyType` 읽기 전용 매핑이고 값은 불변 JSON 스칼라뿐이다.
+  `FIXED_PARAMS["gamma"] = ...`는 TypeError다. 반환된 params는 독립된 dict이므로 호출자가 바꿔도
+  전역 설정이나 다음 호출에 영향을 주지 않는다. 중첩 가변 값을 추가하면 이 복사 정책도 재검토해야 한다.
+- 상수 자체는 dict가 아니므로 `json.dumps(FIXED_PARAMS)` 또는 `apply_ops(frame, FIXED_PARAMS)`에
+  직접 넘기지 않는다. 반환된 params 또는 `dict(FIXED_PARAMS)`를 사용한다.
+- B의 고정 영상 경로는 기존 계약 `src.dip.fixed:fixed_enhance`로 연결되며 B 코드는 수정하지 않았다.
+- 반환 params에는 실제 적용 옵션 전체를 기록한다. adaptive 전용 rules나 rule ID는 넣지 않는다.
+- 파일 I/O·시간 기록·배치 PNG 생성은 이 함수가 수행하지 않는다. A-09에서 별도로 구현한다.
+
+### 후속 튜닝과 검증 범위
+
+튜닝은 3절의 후보와 기록 양식을 사용하되, 최종 평가 전에 하나의 전역 설정을 확정한다.
+설정 변경은 소스·테스트·이 문서의 표를 함께 바꾸고 커밋을 남긴다.
+코드 커밋과 전체 params를 실험 로그에 보존하고, 기존 fixed 프레임·영상 및 C/D 결과를 재생성한다.
+실행기 기본값만 바꾸는 것으로 FIXED_PARAMS가 바뀌지 않는다는 점에 유의한다.
+
+- 단위 검증: 서로 다른 밝기·해상도에서 동일 params, 반복 결과 일치, JSON 직렬화,
+  반환값 수정 격리, 읽기 전용·작은 입력·잘못된 입력, 기존 apply_ops 위임.
+- 연동 검증: B의 기본 동적 호출로 fixed 영상 생성, FPS·프레임 수·크기 유지, 원본 파일 바이트 보존.
+  MP4는 손실 압축이므로 정확한 픽셀 비교는 단위 테스트에서 하고 영상 연동은 허용 오차로 확인한다.
+- 실제 평가 영상에서의 화질·OCR 개선, 고정 파이프라인 1080p 2초 목표는 **아직 검증하지 않았다**.
+
+검증 기록(2026-11-17): 고정 보정+실행기 단위 테스트 66 passed,
+고정 영상 연동+기존 B 테스트 24 passed, 최종 전체 테스트 **444 passed, 2 skipped**.
+설정의 품질 우수성을 검증한 숫자가 아니라 코드 정확도·연동 검증 결과다.
