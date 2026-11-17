@@ -16,21 +16,53 @@ def to_uint8(values):
     return np.clip(np.rint(values), 0, 255).astype(np.uint8)
 
 
+def _store_channel(values, destination):
+    """Quantize an owned float buffer into one output channel without stacking."""
+    np.rint(values, out=values)
+    np.clip(values, 0, 255, out=values)
+    destination[:] = values
+
+
 def bgr_to_ycrcb(img):
     """Convert uint8 BGR to uint8 (Y, Cr, Cb), with chroma centered at 128."""
     validate_frame(img)
-    b, g, r = np.moveaxis(img.astype(np.float64), -1, 0)
-    y = 0.114 * b + 0.587 * g + 0.299 * r
-    cr = (r - y) * 0.713 + 128.0
-    cb = (b - y) * 0.564 + 128.0
-    return to_uint8(np.stack((y, cr, cb), axis=-1))
+    # Preserve the original float64 operation order while avoiding full BGR
+    # float conversion, channel stacking and repeated full-image clipping copies.
+    y = np.multiply(img[..., 0], 0.114, dtype=np.float64)
+    scratch = np.empty_like(y)
+    np.multiply(img[..., 1], 0.587, out=scratch)
+    np.add(y, scratch, out=y)
+    np.multiply(img[..., 2], 0.299, out=scratch)
+    np.add(y, scratch, out=y)
+    out = np.empty_like(img)
+    np.subtract(img[..., 2], y, out=scratch)
+    np.multiply(scratch, 0.713, out=scratch)
+    np.add(scratch, 128.0, out=scratch)
+    _store_channel(scratch, out[..., 1])
+    np.subtract(img[..., 0], y, out=scratch)
+    np.multiply(scratch, 0.564, out=scratch)
+    np.add(scratch, 128.0, out=scratch)
+    _store_channel(scratch, out[..., 2])
+    _store_channel(y, out[..., 0])
+    return out
 
 
 def ycrcb_to_bgr(img):
     """Convert uint8 (Y, Cr, Cb) to uint8 BGR, clipping out-of-gamut colors."""
     validate_frame(img)
-    y, cr, cb = np.moveaxis(img.astype(np.float64), -1, 0)
-    r = y + (cr - 128.0) / 0.713
-    b = y + (cb - 128.0) / 0.564
-    g = (y - 0.299 * r - 0.114 * b) / 0.587
-    return to_uint8(np.stack((b, g, r), axis=-1))
+    r = np.subtract(img[..., 1], 128.0, dtype=np.float64)
+    np.divide(r, 0.713, out=r)
+    np.add(img[..., 0], r, out=r)
+    b = np.subtract(img[..., 2], 128.0, dtype=np.float64)
+    np.divide(b, 0.564, out=b)
+    np.add(img[..., 0], b, out=b)
+    g = np.multiply(r, 0.299)
+    np.subtract(img[..., 0], g, out=g)
+    scratch = np.multiply(b, 0.114)
+    np.subtract(g, scratch, out=g)
+    np.divide(g, 0.587, out=g)
+    out = np.empty_like(img)
+    _store_channel(b, out[..., 0])
+    _store_channel(g, out[..., 1])
+    _store_channel(r, out[..., 2])
+    return out
