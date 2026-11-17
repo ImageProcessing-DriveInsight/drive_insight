@@ -200,7 +200,7 @@ def test_median_invalid_frame(bad):
 
 
 @pytest.mark.parametrize("sigma,ksize", [(0.1, 3), (0.5, 5), (1, 7), (2, 9), (100, 9)])
-@pytest.mark.parametrize("amount,threshold", [(0.5, 0), (1.2, 10), (3, 50)])
+@pytest.mark.parametrize("amount,threshold", [(0.5, 0), (np.float32(0.8), 5), (1.2, 10), (3, 50)])
 def test_unsharp_reference(sigma, ksize, amount, threshold):
     import cv2
     img = sample_frame()

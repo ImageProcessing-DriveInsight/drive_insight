@@ -42,14 +42,22 @@ def _gaussian_blur(img, ksize, sigma):
     source = img.astype(np.float32)
     height, width = img.shape[:2]
     padded = np.pad(source, ((0, 0), (radius, radius), (0, 0)), mode="reflect")
-    horizontal = np.zeros_like(source)
-    # Only the small kernel is iterated, never pixels or rows.
-    for index, weight in enumerate(kernel):
-        horizontal += weight * padded[:, index:index + width]
+    horizontal = kernel[radius] * padded[:, radius:radius + width]
+    scratch = source  # Padding already owns a copy; reuse the converted input buffer.
+    # Pair symmetric taps, reusing one scratch array instead of per-tap products.
+    # These nonnegative fixed-point sums are exact even when regrouped.
+    for index in range(radius):
+        np.add(padded[:, index:index + width],
+               padded[:, ksize - 1 - index:ksize - 1 - index + width], out=scratch)
+        np.multiply(scratch, kernel[index], out=scratch)
+        np.add(horizontal, scratch, out=horizontal)
     padded = np.pad(horizontal, ((radius, radius), (0, 0), (0, 0)), mode="reflect")
-    result = np.zeros_like(source)
-    for index, weight in enumerate(kernel):
-        result += weight * padded[index:index + height]
+    result = kernel[radius] * padded[radius:radius + height]
+    for index in range(radius):
+        np.add(padded[index:index + height],
+               padded[ksize - 1 - index:ksize - 1 - index + height], out=scratch)
+        np.multiply(scratch, kernel[index], out=scratch)
+        np.add(result, scratch, out=result)
     return result
 
 
@@ -62,7 +70,11 @@ def gaussian(img, ksize, sigma):
     validate_frame(img)
     _validate_ksize(ksize, (3, 5, 7, 9))
     _validate_real(sigma, "sigma", strictly_positive=True)
-    return np.clip(np.floor(_gaussian_blur(img, ksize, sigma) + 0.5), 0, 255).astype(np.uint8)
+    result = _gaussian_blur(img, ksize, sigma)
+    np.add(result, 0.5, out=result)
+    np.floor(result, out=result)
+    np.clip(result, 0, 255, out=result)
+    return result.astype(np.uint8)
 
 
 def median(img, ksize):
@@ -99,11 +111,14 @@ def unsharp(img, amount, sigma, threshold):
     if amount == 0:
         return img.copy()
     radius = max(1, int(np.ceil(min(3.0 * sigma, 4.0))))
-    source = img.astype(np.float64)
-    difference = source - gaussian(img, 2 * radius + 1, sigma).astype(np.float64)
-    difference = np.where(np.abs(difference) >= threshold, difference, 0.0)
+    difference = img.astype(np.int16) - gaussian(img, 2 * radius + 1, sigma).astype(np.int16)
+    difference[np.abs(difference) < threshold] = 0
     with np.errstate(over="ignore"):
-        return to_uint8(source + amount * difference)
+        result = np.multiply(difference, amount, dtype=np.float64)
+        np.add(result, img, out=result)
+    np.rint(result, out=result)
+    np.clip(result, 0, 255, out=result)
+    return result.astype(np.uint8)
 
 
 def gamma(img, g):
