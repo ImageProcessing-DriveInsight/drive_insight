@@ -1,7 +1,6 @@
-"""Ordered operation runner shared by fixed and adaptive enhancement.
+"""Ordered operations and one uncalibrated fixed enhancement baseline."""
 
-Only apply_ops is implemented here; fixed_enhance/FIXED_PARAMS follow separately.
-"""
+from types import MappingProxyType
 
 from . import ops
 from .color import validate_frame
@@ -12,6 +11,20 @@ DEFAULT_KSIZE = 3
 DEFAULT_GAUSSIAN_SIGMA = 1.0
 DEFAULT_UNSHARP_SIGMA = 1.0
 DEFAULT_UNSHARP_THRESHOLD = 5.0
+
+# One frame-independent baseline. Tune only in a separate, recorded experiment.
+# A read-only mapping prevents accidental in-place changes by downstream code.
+# All values are immutable JSON scalars; fixed_enhance returns an ordinary copy.
+FIXED_PARAMS = MappingProxyType({
+    "denoise": "gaussian",
+    "ksize": 3,
+    "sigma": 1.0,
+    "gamma": 0.75,
+    "hist_eq": False,
+    "unsharp": 0.8,
+    "unsharp_sigma": 1.0,
+    "unsharp_threshold": 5.0,
+})
 
 _KNOWN_KEYS = frozenset({
     "denoise", "ksize", "sigma", "gamma", "hist_eq", "unsharp",
@@ -72,3 +85,14 @@ def apply_ops(img, params):
     if config["unsharp"] != 0.0:
         out = ops.unsharp(out, config["unsharp"], config["unsharp_sigma"], config["unsharp_threshold"])
     return out
+
+
+def fixed_enhance(img):
+    """Return (out, params) using the same FIXED_PARAMS for every frame.
+
+    params is a fresh JSON-serializable dict containing every effective option.
+    Neither input content nor quality measurements select or change the settings.
+    This is an uncalibrated baseline, not a claim of improved OCR or real-time speed.
+    """
+    params = dict(FIXED_PARAMS)
+    return apply_ops(img, params), params
