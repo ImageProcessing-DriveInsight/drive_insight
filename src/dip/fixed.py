@@ -73,7 +73,8 @@ def apply_ops(img, params):
     """
     validate_frame(img)
     config = _validated_params(params)
-    out = img.copy()
+    # Individual ops preserve their input; defer the copy for an identity pipeline.
+    out = img
     if config["denoise"] == "gaussian":
         out = ops.gaussian(out, config["ksize"], config["sigma"])
     elif config["denoise"] == "median":
@@ -84,7 +85,7 @@ def apply_ops(img, params):
         out = ops.hist_eq(out)
     if config["unsharp"] != 0.0:
         out = ops.unsharp(out, config["unsharp"], config["unsharp_sigma"], config["unsharp_threshold"])
-    return out
+    return out.copy() if out is img else out
 
 
 def fixed_enhance(img):
