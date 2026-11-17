@@ -120,6 +120,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 - 크롭은 `results/ocr/crops/<cond>/<frame_id>_<n>.png`에 저장합니다(git 제외).
 - `results/ocr/<cond>.csv` 열: `frame, plate, x, y, w, h, crop_path, text, conf, status, ocr_ms`. 번호판이 없는 프레임도 한 줄을 남겨 세 조건의 프레임 목록이 같게 합니다.
 - 실제 사진으로 끝까지 실행: readable·정확 7/10, uncertain 3/10, 틀린 readable 0건, 장당 약 1.6초.
+  10장 중 3장은 자동차 회사 광고용 번호판(케, 차)이라, 번호판 글자 검사(#34) 이후에는 uncertain이고 실제 번호판 7장 중 5장이 readable·정확입니다.
 
 ### C-09 평가 — `src/eval/ocr.py`, [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)
 

@@ -120,6 +120,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 - Crops in `results/ocr/crops/<cond>/<frame_id>_<n>.png` (ignored by git).
 - `results/ocr/<cond>.csv` columns: `frame, plate, x, y, w, h, crop_path, text, conf, status, ocr_ms`. A frame with no plate keeps one row, so all conditions list the same frames.
 - Real photos end to end: 7/10 readable and exact, 3/10 uncertain, 0 wrong readable, about 1.6 s per frame.
+  3 of the 10 are carmaker advertising plates (케, 차); with the plate character check (#34) they are uncertain, and 5 of the 7 real plates are readable and exact.
 
 ### C-09 Evaluation — `src/eval/ocr.py`, [docs/ocr_evaluation.md](../ocr_evaluation.md)
 

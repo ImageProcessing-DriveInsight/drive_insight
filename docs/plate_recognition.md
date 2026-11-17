@@ -32,6 +32,7 @@ Plate crops show real plates and are ignored by git.
 A frame with no plate still gets one row, so the CSVs of all conditions list the same frames.
 
 On the 10 real photos: the labeled plate was readable and exact in 7/10, the other 3 were uncertain, and no wrong read was readable. About 1.6 s per frame on CPU.
+3 of the 10 turned out to be carmaker advertising plates (케, 차), which no real car carries. Since the plate character check (#34) they are uncertain: 5 of the 7 real plates are readable and exact, 2 uncertain, none wrong.
 
 ## Preprocessing (C-04)
 
@@ -90,7 +91,21 @@ Otsu binarization breaks thin strokes and loses most reads.
 | uncertain | conf ≥ 0.5 and one fix makes it fit the format | `?` at the unsure position |
 | unreadable | anything else | `None` |
 
-Plate format: `^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$` (optional region name, e.g. `서울12가3456`).
+Plate format: optional region, 2–3 digits, one use character, 4 digits (e.g. `12가3456`, `123가4567`,
+`서울12바3456`). Only plate characters fit:
+
+| Part | Characters |
+| --- | --- |
+| Use, private | 가 나 다 라 마 거 너 더 러 머 버 서 어 저 고 노 도 로 모 보 소 오 조 구 누 두 루 무 부 수 우 주 |
+| Use, commercial (taxi, bus, truck) | 바 사 아 자 |
+| Use, parcel delivery | 배 |
+| Use, rental | 하 허 호 |
+| Region (commercial plates) | 서울 부산 대구 인천 광주 대전 울산 세종 경기 강원 충북 충남 전북 전남 경북 경남 제주 |
+
+Any other Hangul is a misread, so it gets `?` like any other single error. In the plate size check (#32),
+every wrong read that was still judged readable had such a Hangul (read as 에, 년, 시, 지) with the
+right digits; all 7 are now uncertain. Carmaker advertising plates (e.g. 케, 차) are uncertain too,
+since no real car carries them.
 
 One fix means, in order: replace one character with `?`, insert one `?`, or drop one character.
 If more than one place could be wrong, the result is unreadable. No character is ever filled in.
@@ -104,6 +119,7 @@ These stay uncertain, never readable.
 | `12가3456` | 0.95 | readable | `12가3456` |
 | `12가3456` | 0.70 | uncertain | `12가3456` |
 | `1273456` (Hangul read as 7) | 0.99 | uncertain | `12?3456` |
+| `12에3456` (에 is not a plate character) | 0.95 | uncertain | `12?3456` |
 | `123456` (Hangul dropped) | 0.90 | uncertain | `12?3456` |
 | `12가34567` (one extra digit, could be any) | 0.90 | unreadable | `None` |
 | any | < 0.5 | unreadable | `None` |
