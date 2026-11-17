@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from src.plate.judge import fit_with_one_fix, judge
+from src.plate.judge import REGIONS, USE_CHARS, fit_with_one_fix, judge
 from src.plate.ocr import join_lines, normalize_text
 from src.plate.preprocess import (TARGET_H, contrast_stretch, estimate_skew, otsu, preprocess_plate,
                                   resize_bilinear, rotate_bilinear)
@@ -82,9 +82,24 @@ def test_join_lines_orders_two_line_plate():
     ("12가3456", 0.40, ("unreadable", None)),
     ("", 0.90, ("unreadable", None)),
     ("가나다", 0.90, ("unreadable", None)),
+    ("12바3456", 0.90, ("readable", "12바3456")),  # commercial
+    ("12배3456", 0.90, ("readable", "12배3456")),  # parcel delivery
+    ("123허4567", 0.90, ("readable", "123허4567")),  # rental
+    ("부산12아3456", 0.90, ("readable", "부산12아3456")),
+    ("12에3456", 0.95, ("uncertain", "12?3456")),  # not a plate character: an OCR misread
+    ("123케4567", 0.95, ("uncertain", "123?4567")),  # carmaker advertising plate
+    ("서올12바3456", 0.90, ("uncertain", "서?12바3456")),  # misread region
+    ("가나12가3456", 0.90, ("unreadable", None)),  # not a region, no single fix
 ])
 def test_judge(text, conf, expected):
     assert judge(text, conf) == expected
+
+
+def test_plate_characters():
+    assert len(USE_CHARS) == len(set(USE_CHARS)) == 32 + 4 + 1 + 3
+    assert len(REGIONS) == len(set(REGIONS)) == 17
+    for ch in "에년시지케차":
+        assert ch not in USE_CHARS
 
 
 def test_fit_with_one_fix_never_fills_characters():
