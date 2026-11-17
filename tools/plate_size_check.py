@@ -1,7 +1,8 @@
 """Plate size and degradation check: how small and how degraded can a plate be and still be read?
 
 Each sample is shrunk so its plate is W px wide (area averaging, like a camera
-farther away), degraded, JPEG-compressed like a video frame, then read:
+farther away), degraded, JPEG-compressed like a video frame, then read. A sample
+whose plate is narrower than W is left out of that width (never upscaled):
 
   crop   hand crops -> read_plate (preprocess -> OCR -> judge): reading only.
   frame  full photos pasted on a 1920x1080 frame -> detect_plates (vehicle ->
@@ -36,6 +37,7 @@ from src.plate.detect import STATUS_RANK, detect_plates, detect_vehicles, read_p
 from src.plate.imgutil import load_png  # noqa: E402
 
 WIDTHS = (120, 100, 80, 60, 50, 40, 30, 25, 20)  # target plate width in px
+WIDTH_TOL = 0.95  # a sample counts for width W only if its plate is at least WIDTH_TOL * W wide (no upscaling)
 FRAME_SIZE = (1080, 1920)  # (H, W) of a dashcam frame
 FILL = 114  # gray around the pasted photo
 JPEG_QUALITY = 75
@@ -162,6 +164,8 @@ def crop_test(samples, labels, widths):
     for i, path in enumerate(list_images(samples / "crops")):
         crop, label = load_png(path), labels[path.stem]
         for width in widths:
+            if crop.shape[1] < WIDTH_TOL * width:
+                continue
             small = shrink(crop, width / crop.shape[1])
             for d, (variant, degrade) in enumerate(DEGRADATIONS.items()):
                 img = jpeg(degrade(small, np.random.default_rng([SEED, i, width, d])))
@@ -186,6 +190,8 @@ def frame_test(samples, labels, widths, out):
         native = max(ref, key=lambda p: char_accuracy(p["text"], label))["bbox"][2]  # plate width in the photo
         variants = {**{v: (v, None) for v in DEGRADATIONS}, **ENHANCED}
         for width in widths:
+            if native < WIDTH_TOL * width:
+                continue
             scale = min(1.0, width / native)
             canvas = paste_center(shrink(photo, scale))
             for variant, (base, enhance) in variants.items():
