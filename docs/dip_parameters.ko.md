@@ -190,7 +190,8 @@ CPU 모델·전원 모드·부하는 기록하지 않았으므로 정식 벤치�
 ### D: 실행기·시간 측정·패키지
 
 - 반환 영상은 uint8 BGR, params는 JSON 가능 dict로 맞춘다. 함수에서 파일 I/O를 강제하지 않는다.
-- 예정 파라미터 로그는 `results/params/fixed.json`이다. 프레임 키·단위·스키마는 B·D와 합의 후 구현한다.
+- 고정 배치 로그는 `results/params/fixed.json`이다. 이슈 #48의 파일명 기반 스키마와 측정 범위는
+  [배치 가이드](fixed_batch.ko.md)에 기록한다. B/D 집계 시 시간 범위를 맞춰야 한다.
 - D의 `timing.csv`에 필요한 enhance_ms와 A의 일괄 로그 시간이 어떤 범위를 재는지 명시해 중복·누락을 막는다.
 - 설정과 코드 커밋을 실행 스냅샷에 기록하고 기존 출력과 캐시를 다른 설정의 결과로 재사용하지 않는다.
 
@@ -208,7 +209,8 @@ python -m pytest -q
 - [ ] B와 params 형식, 기본값 및 Unsharp 세부 동작 합의
 - [x] apply_ops 구현과 순서·예외·빈 dict·B 연동 테스트 (이슈 #44)
 - [x] fixed_enhance/FIXED_PARAMS 구현 및 테스트 (이슈 #46, 초기 기준 설정)
-- [ ] 평가 프레임 확보 후 일괄 생성·로그·파일 목록 검증
+- [x] 고정 PNG 일괄 생성·로그·실패 복구 구현 및 합성 프레임 검증 (이슈 #48)
+- [ ] 실제 평가 프레임 확보 후 산출물 생성·파일 목록 검증
 - [ ] 파라미터 실험과 채택/기각 근거 기록
 - [ ] 실제 영상의 색 테두리·halo·잡음·번호판 획 소실 확인
 - [ ] 반복 벤치마크와 A-10 속도 목표 검증
@@ -348,3 +350,12 @@ hist_eq=False이므로 평활화는 생략한다. denoise와 Unsharp에 각각 G
 검증 기록(2026-11-17): 고정 보정+실행기 단위 테스트 66 passed,
 고정 영상 연동+기존 B 테스트 24 passed, 최종 전체 테스트 **444 passed, 2 skipped**.
 설정의 품질 우수성을 검증한 숫자가 아니라 코드 정확도·연동 검증 결과다.
+
+## 9. 고정 PNG 배치 생성 (이슈 #48)
+
+`from src.dip.batch import enhance_fixed_frames` 또는 `python -m src.dip.batch`로 실행한다.
+fixed_enhance의 초기 기준 설정은 그대로 유지한다. 기본 입력은 `data/frames/orig/`,
+출력은 `data/frames/fixed/`, 로그는 `results/params/fixed.json`이다.
+원본 보존, 파일명 일치, 연산 전용 enhance_ms와 I/O 포함 total_ms, 성공 로그 발행 및
+중간 실패 복구 정책은 [고정 배치 가이드](fixed_batch.ko.md)에 구분해 기록했다.
+합성 데이터 검증 완료와 실제 평가 산출물 전달 완료는 별개다.
