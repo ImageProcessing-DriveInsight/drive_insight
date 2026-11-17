@@ -1,7 +1,8 @@
 # 역할 A: 파라미터·구현 결정·실험 및 연동 가이드
 
-기준: 2026-11-17, PR [#30](https://github.com/ImageProcessing-DriveInsight/drive_insight/pull/30),
-구현 커밋 `0d995ce`. 이 문서는 팀 공유용이다. 로컬 작업 메모 `dip.md`와는 별개다.
+기준: 2026-11-17. A-01~06은 PR [#30](https://github.com/ImageProcessing-DriveInsight/drive_insight/pull/30),
+apply_ops는 이슈 [#44](https://github.com/ImageProcessing-DriveInsight/drive_insight/issues/44)의 구현이다.
+이 문서는 팀 공유용이다. 로컬 작업 메모 `dip.md`와는 별개다.
 아래의 **현재 구현**, **명세 요구**, **미합의 제안**을 구분해서 읽는다.
 아직 FIXED_PARAMS나 적응형 규칙을 선정한 상태가 아니다.
 
@@ -163,17 +164,17 @@ CPU 모델·전원 모드·부하는 기록하지 않았으므로 정식 벤치�
 
 ### B: 적응형 보정과 영상 I/O
 
-- 현재 제공 가능: 이 문서의 7개 함수. `apply_ops`와 `fixed_enhance`는 **아직 미구현**이다.
-- 예정 계약: `apply_ops(frame, params) -> out`, `fixed_enhance(frame) -> (out, params)`.
+- 현재 제공 가능: 기존 7개 연산과 `src.dip.fixed:apply_ops` (또는 `from src.dip import apply_ops`).
+  `fixed_enhance`와 `FIXED_PARAMS`는 **아직 미구현**이다.
+- 구현 계약: `apply_ops(frame, params) -> out`. 예정 계약: `fixed_enhance(frame) -> (out, params)`.
 - 명세 순서: 노이즈 제거 → 감마 → 평활화 → Unsharp.
   키 누락은 해당 연산 생략, 모르는 키는 ValueError, `rules` 키는 무시한다.
 - 계획 문서의 `{"gamma":0.6,"denoise":"median","ksize":5,"unsharp":1.2,"rules":[...]}`는
-  **예시**일 뿐 아직 파서가 지원하는 확정 스키마가 아니다.
-- A·B가 합의할 항목: 평활화 키 이름·bool 형식, Gaussian sigma 키, Unsharp amount/sigma/threshold 키,
-  denoise 비활성 값, 키가 일부만 있을 때 기본값/오류 처리, 직렬화 가능한 숫자 타입,
-  Unsharp 마스크 단위와 커널 산정 규칙.
+  이슈 #44부터 실제 지원하는 형식이다. B의 현재 select_params 출력도 그대로 지원한다.
+- 평활화 키·비활성 값은 B의 현재 코드에 맞췄다. A가 추가한 기본값/확장 키는 아래 7절에 기록한다.
+  Gaussian sigma와 Unsharp sigma/threshold의 기본값, 마스크 단위·커널 산정 규칙은 팀 리뷰 대상이다.
 - JSON에는 파이썬 기본 타입을 사용한다. NumPy 스칼라를 그대로 저장하지 않는다.
-  확정 후 같은 params를 A·B 테스트 양쪽에 넣어 결과·규칙 ID가 유지되는지 확인한다.
+  현재 B의 실제 규칙 7종, 기본 동적 호출 및 PNG 일괄 생성·로그 연동을 테스트한다.
 - B의 밝기·대비 측정 Y 계수와 A의 정의가 일치하는지도 확인한다.
 
 ### C: OCR 비교
@@ -203,7 +204,8 @@ python -m pytest -q
 실제 모델·폰트 의존 테스트 생략은 실제 영상 검증 완료를 의미하지 않는다.
 
 - [ ] B와 params 형식, 기본값 및 Unsharp 세부 동작 합의
-- [ ] apply_ops/fixed_enhance 구현과 순서·예외·빈 dict 테스트
+- [x] apply_ops 구현과 순서·예외·빈 dict·B 연동 테스트 (이슈 #44)
+- [ ] fixed_enhance/FIXED_PARAMS 구현 및 테스트
 - [ ] 평가 프레임 확보 후 일괄 생성·로그·파일 목록 검증
 - [ ] 파라미터 실험과 채택/기각 근거 기록
 - [ ] 실제 영상의 색 테두리·halo·잡음·번호판 획 소실 확인
@@ -212,3 +214,69 @@ python -m pytest -q
 
 결정을 바꾸면 날짜, 관련 이슈/커밋, 이전 값→새 값, 이유, 비교 프레임 및 지표,
 재생성해야 할 출력, 영향을 받는 팀원을 이 문서 또는 연결된 실험 기록에 추가한다.
+
+## 7. apply_ops 파라미터 계약 v0.1 (이슈 #44)
+
+```python
+from src.dip import apply_ops
+
+out = apply_ops(frame, {
+    "denoise": "gaussian", "ksize": 3, "sigma": 1.0,
+    "gamma": 0.75, "hist_eq": False,
+    "unsharp": 0.8, "unsharp_sigma": 1.0, "unsharp_threshold": 5.0,
+    "rules": ["EXAMPLE"],
+})
+```
+
+이 값들은 호출 예시다. 최종 FIXED_PARAMS를 뜻하지 않는다.
+모든 키는 선택 사항이다. 실행 순서는 dict 삽입 순서와 무관하게
+**denoise → gamma → hist_eq → unsharp**다. 연산 사이에 uint8 출력이 전달되며 각 연산을
+독립 호출한 결과와 같다. Y 변환을 합쳐 중간 반올림을 생략하는 최적화는 하지 않았다.
+
+| 키 | 현재 계약 | 생략 시 | 근거 |
+| --- | --- | --- | --- |
+| denoise | `"none"`, `"gaussian"`, `"median"` | `"none"`, 생략 | B의 기존 출력 지원 |
+| ksize | 정수 3/5/7/9, median일 때 3/5 | 3 | B 기본값 3을 재사용 |
+| sigma | Gaussian용 유한 실수 >0 | **1.0** | A의 연동 기본값, 미튜닝 |
+| gamma | 유한 실수 0.3~3.0 | 1.0, 생략 | 명세 범위·B 항등 설정 |
+| hist_eq | Python bool만 허용 | False, 생략 | B가 이미 사용하는 키·타입 |
+| unsharp | 유한 실수 >=0, amount로 사용 | 0.0, 생략 | B가 이미 사용하는 숫자 강도 |
+| unsharp_sigma | 유한 실수 >0 | **1.0** | A의 연동 기본값, 미튜닝 |
+| unsharp_threshold | 유한 실수 >=0 | **5.0** | A가 선택한 초기 노이즈 억제값, 미튜닝 |
+| rules | 메타데이터, 값에 접근하지 않고 무시 | 없음 | 명세·B 계약 |
+
+**명세에서 확정하지 않은 결정과 변경 영향:**
+
+- sigma=1.0: B의 Gaussian 분기에 sigma가 없어서 명시적인 연동 기본값을 넣었다.
+  현재 B의 NS_MEDIUM은 Gaussian(3,1.0)이 된다. 1.0의 우수성을 실험으로 확인한 것은 아니다.
+- unsharp_sigma=1.0, threshold=5.0: B가 amount만 보내므로 기존 함수의 필수 인자를 보완했다.
+  현재 SH_LOW는 Unsharp(0.8,1.0,5.0)이 된다. 5.0은 미세한 강도 차이의 증폭을 줄이려는 초기 선택이다.
+  값이 달라지면 B의 규칙 ID가 같아도 영상이 달라지므로 프레임·OCR/VLM 결과를 재생성해야 한다.
+- 확장 키는 `sigma`, `unsharp_sigma`, `unsharp_threshold`로 정했다. 한 sigma가 두 필터에
+  암묵적으로 적용되지 않도록 구분했다. 새 키 이름은 팀 리뷰 대상이며 별칭은 지원하지 않는다.
+- 비활성은 키 생략 또는 위의 명시적인 항등 설정으로 표현한다. None/False를 denoise 값으로 쓰지 않는다.
+  gamma=1 또는 unsharp=0은 실제 연산 호출도 생략하여 불필요한 계산을 피한다.
+- ksize/sigma만 전달해도 노이즈 제거가 켜지지 않는다. Unsharp 보조 키만 전달해도 샤프닝이 켜지지 않는다.
+  B가 항상 ksize를 포함하는 구조와 호환된다.
+- **알려진 비활성 옵션도 검증**한다. 예를 들어 `{"unsharp":0,"unsharp_sigma":0}`은 오류다.
+  잘못된 설정이 나중에 연산을 켤 때까지 숨지 않도록 정한 정책이다.
+- 모든 키와 값은 첫 연산 전에 검증한다. 알 수 없는 키나 잘못된 타입/범위는 ValueError다.
+  rules의 내용은 검사하지 않는다. 프레임과 params를 수정하지 않고 빈 dict도 새 배열을 반환한다.
+- `hist_eq=1`/`"true"`/NumPy bool, bool인 수치 파라미터는 거부한다. JSON에서 복원한 bool은 지원한다.
+
+### B 문서와 연산 순서의 차이
+
+B의 이전 rules.md에는 "평활화 → 감마"가 제안되어 있었다.
+원래 명세 A-07의 "감마 → 평활화"를 우선하여 구현했고 rules.md에도 실제 순서를 표시했다.
+B의 규칙 임계값·규칙 ID·select_params 코드는 바꾸지 않았다.
+순서를 바꾸려면 A·B가 합의하고 비가환성 테스트, 튜닝 및 결과 생성을 함께 변경해야 한다.
+
+### 이번 범위의 완료·미완료
+
+- A-07 실행기와 B의 실제 규칙/동적 호출/PNG 일괄 생성 연동 테스트를 추가했다.
+- A-08 fixed_enhance와 FIXED_PARAMS, A-09 고정 프레임 생성, A-10 성능 목표는 이번 범위가 아니다.
+- 실제 평가 데이터로 이 기본값들을 검증한 상태가 아니며, 실제 영상 비교·튜닝은 여전히 필요하다.
+
+검증 기록(2026-11-17): 기존 연산+실행기 단위 테스트 316 passed,
+B 연동+기존 B 테스트 32 passed, 최종 전체 테스트 **429 passed, 2 skipped**.
+생략된 테스트는 기존 YOLO 가중치/실제 OCR 환경 의존 항목이며 실제 데이터 검증을 대체하지 않는다.
