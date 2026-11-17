@@ -2,8 +2,19 @@
 
 import re
 
-PLATE_RE = re.compile(r"^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$")  # optional region name, e.g. 서울12가3456
-MASKED_RE = re.compile(r"^([가-힣?]{2})?[\d?]{2,3}[가-힣?][\d?]{4}$")  # same, '?' may stand anywhere
+# Use characters on current plates. Others never appear on a real car: OCR misreads (에, 년, 시, 지)
+# or carmaker advertising plates (케, 차).
+USE_CHARS = ("가나다라마거너더러머버서어저고노도로모보소오조구누두루무부수우주"  # private
+             "바사아자"  # commercial transport (taxi, bus, truck)
+             "배"  # parcel delivery
+             "하허호")  # rental
+REGIONS = ("서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기", "강원", "충북", "충남", "전북", "전남",
+           "경북", "경남", "제주")  # optional prefix on commercial plates, e.g. 서울12바3456
+_MASKED_REGIONS = sorted({m for r in REGIONS for m in (r, "?" + r[1], r[0] + "?")})  # one region character unsure
+
+PLATE_RE = re.compile(rf"^({'|'.join(REGIONS)})?\d{{2,3}}[{USE_CHARS}]\d{{4}}$")
+MASKED_RE = re.compile(  # same, '?' may stand anywhere
+    rf"^({'|'.join(map(re.escape, _MASKED_REGIONS))})?[\d?]{{2,3}}[{USE_CHARS}?][\d?]{{4}}$")
 READABLE_CONF, UNCERTAIN_CONF = 0.8, 0.5
 
 
@@ -31,9 +42,11 @@ def fit_with_one_fix(text):
 def judge(text, conf):
     """Decide the read status.
 
-    readable:   full plate format and conf >= READABLE_CONF.
+    readable:   full plate format and conf >= READABLE_CONF. The format holds only plate
+                characters: a use character from USE_CHARS, and a region from REGIONS if any.
     uncertain:  conf >= UNCERTAIN_CONF and either the format matches with conf below
-                READABLE_CONF, or one fix makes it match ('?' marks that position).
+                READABLE_CONF, or one fix makes it match ('?' marks that position, e.g. a
+                Hangul that is not a plate character).
     unreadable: anything else; text becomes None.
 
     Returns:
