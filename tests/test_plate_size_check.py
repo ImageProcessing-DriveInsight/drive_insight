@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from tools.plate_size_check import (ROW_COLUMNS, area_weights, best_read, center_box, fog, jpeg, load_rows, low_light,
-                                    make_row, motion_blur, paste_center, read_labels, shrink, summarize, write_rows)
+                                    make_row, motion_blur, paste_center, read_labels, real_plates, shrink, summarize,
+                                    write_rows)
 
 
 def test_area_weights_rows_are_means():
@@ -84,6 +85,12 @@ def test_rows_round_trip(tmp_path):
             make_row("frame", "a", "clean", 40, 41, 2, "12가3456", (None, "missed", 0.0, 0.0), 900.0)]
     path = write_rows(tmp_path / "size.csv", ROW_COLUMNS, rows)
     assert summarize(load_rows(path)) == summarize(rows)
+
+
+def test_real_plates():
+    labels = {"a": "12가3456", "b": "123케4567", "c": "서울12바3456", "d": "12차3456"}
+    kept, skipped = real_plates(labels)
+    assert kept == {"a": "12가3456", "c": "서울12바3456"} and skipped == ["b", "d"]
 
 
 def test_read_labels_cp949(tmp_path):
