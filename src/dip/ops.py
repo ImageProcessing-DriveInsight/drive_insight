@@ -1,10 +1,16 @@
 """Luminance corrections. OpenCV is deliberately absent from this module."""
 
 from numbers import Integral, Real
+from concurrent.futures import ThreadPoolExecutor
+import os
 
 import numpy as np
 
 from .color import bgr_to_ycrcb, to_uint8, validate_frame, ycrcb_to_bgr
+
+_MEDIAN_BLOCK_ROWS = 32
+_MEDIAN_MAX_WORKERS = 4
+_MEDIAN_PARALLEL_MIN_PIXELS = 512 * 512
 
 
 def _validate_ksize(ksize, allowed):
@@ -80,8 +86,9 @@ def gaussian(img, ksize, sigma):
 def median(img, ksize):
     """Median of each BGR channel in a 3x3 or 5x5 window, replicating borders.
 
-    Process vectorized row blocks to bound the temporary partition array's size.
-    No channel mixing, pixel loops or input mutation.
+    Process vectorized 32-row blocks using int32 partition buffers (exact for uint8).
+    Large images use at most four workers with disjoint outputs. No pixel loops,
+    channel mixing or input mutation; smaller images run in the calling thread.
     """
     validate_frame(img)
     _validate_ksize(ksize, (3, 5))
@@ -89,11 +96,22 @@ def median(img, ksize):
     padded = np.pad(img, ((radius, radius), (radius, radius), (0, 0)), mode="edge")
     windows = np.lib.stride_tricks.sliding_window_view(padded, (ksize, ksize), axis=(0, 1))
     out = np.empty_like(img)
-    for start in range(0, img.shape[0], 64):
-        # Partition an owned buffer in place; never write into the overlapping view.
-        block = np.ascontiguousarray(windows[start:start + 64])
+    def process(start):
+        stop = start + _MEDIAN_BLOCK_ROWS
+        # NumPy's int32 selection path is faster here; values 0..255 remain exact.
+        # Each worker owns its partition buffer, never writing the overlapping view.
+        block = np.array(windows[start:stop], dtype=np.int32, order="C")
         block = block.reshape(*block.shape[:3], ksize * ksize)
-        out[start:start + 64] = np.median(block, axis=-1, overwrite_input=True)
+        out[start:stop] = np.median(block, axis=-1, overwrite_input=True)
+    starts = range(0, img.shape[0], _MEDIAN_BLOCK_ROWS)
+    workers = min(_MEDIAN_MAX_WORKERS, os.cpu_count() or 1, len(starts))
+    if workers > 1 and img.shape[0] * img.shape[1] >= _MEDIAN_PARALLEL_MIN_PIXELS:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            # Observe every result so worker errors propagate before returning.
+            list(pool.map(process, starts))
+    else:
+        for start in starts:
+            process(start)
     return out
 
 

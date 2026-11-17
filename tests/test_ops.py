@@ -199,6 +199,20 @@ def test_median_invalid_frame(bad):
         median(bad, 3)
 
 
+@pytest.mark.parametrize("workers", [1, 4])
+@pytest.mark.parametrize("ksize", [3, 5])
+def test_median_serial_parallel_blocks_are_exact(workers, ksize, monkeypatch):
+    import cv2
+    import src.dip.ops as ops
+    monkeypatch.setattr(ops.os, "cpu_count", lambda: workers)
+    monkeypatch.setattr(ops, "_MEDIAN_PARALLEL_MIN_PIXELS", 1)
+    img = np.random.default_rng(50).integers(0, 256, (131, 19, 3), dtype=np.uint8)[:, ::-1]
+    before = img.copy()
+    img.flags.writeable = False
+    np.testing.assert_array_equal(median(img, ksize), cv2.medianBlur(img, ksize))
+    np.testing.assert_array_equal(img, before)
+
+
 @pytest.mark.parametrize("sigma,ksize", [(0.1, 3), (0.5, 5), (1, 7), (2, 9), (100, 9)])
 @pytest.mark.parametrize("amount,threshold", [(0.5, 0), (np.float32(0.8), 5), (1.2, 10), (3, 50)])
 def test_unsharp_reference(sigma, ksize, amount, threshold):
