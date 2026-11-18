@@ -142,9 +142,11 @@ def draw(frame, entry):
     for (x, y, w, h), color, label in items:
         d.rectangle([x, y, x + w - 1, y + h - 1], outline=color, width=width)
         left, top, right, bottom = d.textbbox((0, 0), label, font=f)
-        ty = y - (bottom - top) - 4 if y - (bottom - top) - 4 >= 0 else y + h + 2
-        d.rectangle([x, ty, x + right - left + 4, ty + bottom - top + 4], fill=color)
-        d.text((x + 2 - left, ty + 2 - top), label, fill=(0, 0, 0), font=f)
+        tw, th = right - left + 4, bottom - top + 4
+        tx = max(0, min(x, img.width - tw))  # keep the label inside the frame
+        ty = y - th if y >= th else min(y + h + 1, img.height - th)
+        d.rectangle([tx, ty, tx + tw, ty + th], fill=color)
+        d.text((tx + 2 - left, ty + 2 - top), label, fill=(0, 0, 0), font=f)
     return np.asarray(img)[..., ::-1].copy()
 
 
