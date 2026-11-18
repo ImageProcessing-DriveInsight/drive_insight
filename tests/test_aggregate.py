@@ -105,6 +105,22 @@ def test_labels_rescore_plate_csvs(tmp_path):
     assert (o["plates"], o["detection_rate"], o["exact_match"], o["char_accuracy"]) == ("1", "1.0", "1.0", "1.0")
 
 
+def test_timing_per_condition_folders(tmp_path):
+    """D's runner writes results/<cond>/timing.csv; a row without a condition takes the folder name."""
+    write_csv(tmp_path / "timing.csv", TIMING_HEADER, [["x.png", "orig", 0, 2, "", 2]])
+    write_csv(tmp_path / "fixed" / "timing.csv", TIMING_HEADER,
+              [["x.png", "fixed", 4, 2, "", 6], ["y.png", "", 6, 2, "", 8]])
+    write_csv(tmp_path / "adaptive" / "timing.csv", ["frame", "total_ms"], [["x.png", 9]])
+    aggregate(tmp_path)
+    s = read_summary(tmp_path)
+    assert (s["orig"]["total_ms"], s["fixed"]["enhance_ms"], s["fixed"]["total_ms"], s["adaptive"]["total_ms"]) == \
+        ("2.0", "5.0", "7.0", "9.0")
+
+    write_csv(tmp_path / "timing.csv", TIMING_HEADER, [["x.png", "fixed", 0, 2, "", 2]])  # also in fixed/
+    with pytest.raises(ValueError, match="twice"):
+        aggregate(tmp_path)
+
+
 def test_needs_condition_column(tmp_path):
     write_csv(tmp_path / "timing.csv", ["frame", "cond", "total_ms"], [["x.png", "orig", 5]])
     with pytest.raises(ValueError, match="condition"):
