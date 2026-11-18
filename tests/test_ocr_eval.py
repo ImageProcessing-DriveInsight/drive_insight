@@ -94,6 +94,23 @@ def test_box_closest_in_size_wins():
     assert s["exact_match"] == 1.0
 
 
+def test_nonstandard_labels_left_out_of_rates():
+    """Advertising plates (케, 차) can never be judged readable, so they are counted apart.
+    A readable answer on one is still a confident wrong read."""
+    labels = {"a.png": [{"bbox": [0, 0, 100, 30], "text": "12가3456"},
+                        {"bbox": [200, 0, 100, 30], "text": "123케4567"},
+                        {"bbox": [400, 0, 100, 30], "text": "12차3456"}]}
+    results = [row("a.png", 0, 0, 100, 30, "12가3456", "readable"),
+               row("a.png", 200, 0, 100, 30, "123?4567", "uncertain"),
+               row("a.png", 400, 0, 100, 30, "12가3456", "readable")]
+    s = ev.eval_ocr(results, labels)
+    assert (s["plates"], s["nonstandard_labels"], s["unreadable_labels"]) == (1, 2, 0)
+    assert s["exact_match"] == 1.0 and s["char_accuracy"] == 1.0
+    assert s["readable_wrong"] == 1
+    assert [p["label"] for p in ev.plate_details(results, labels)["a"]] == ["12가3456"]
+    assert ev.is_standard("서울12바3456") and not ev.is_standard("12가 3456")
+
+
 def test_edit_distance():
     assert ev.edit_distance("12가3456", "12가3456") == 0
     assert ev.edit_distance("12?3456", "12가3456") == 1
