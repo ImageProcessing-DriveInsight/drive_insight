@@ -35,8 +35,8 @@ def test_hand_case_merges_three_sources(tmp_path):
         vlm 3000 (empty cell skipped), total (1500 + 4700) / 2 = 3100.
     """
     write_csv(tmp_path / "ocr" / "ocr_summary.csv", OCR_HEADER,
-              [["orig", 2, 4, 1, 0.75, 0.5, 0.8125, 1, 0, 0],
-               ["fixed", 2, 4, 1, 1.0, 0.75, 0.9375, 0, 0, 0]])
+              [["orig", 2, 4, 1, 0, 0.75, 0.5, 0.8125, 1, 0, 0],
+               ["fixed", 2, 4, 1, 0, 1.0, 0.75, 0.9375, 0, 0, 0]])
     write_csv(tmp_path / "vlm" / "score.csv", SCORE_HEADER,
               [["orig", "fog_01", 4, 1, 4, 1, 2, 0.25, 25.0],
                ["orig", "fog_02", 6, 3, 6, 3, 1, 0.5, 50.0]])
@@ -95,7 +95,7 @@ def test_missing_sources_and_condition_order(tmp_path):
 
 def test_labels_rescore_plate_csvs(tmp_path):
     """With labels, ocr/<cond>.csv is scored again and a stale ocr_summary.csv is ignored."""
-    write_csv(tmp_path / "ocr" / "ocr_summary.csv", OCR_HEADER, [["orig", 1, 1, 0, 0.0, 0.0, 0.0, 0, 0, 0]])
+    write_csv(tmp_path / "ocr" / "ocr_summary.csv", OCR_HEADER, [["orig", 1, 1, 0, 0, 0.0, 0.0, 0.0, 0, 0, 0]])
     write_csv(tmp_path / "ocr" / "orig.csv", PLATE_HEADER,
               [["a.png", 0, 10, 10, 100, 30, "c.png", "12가3456", 0.95, "readable", 1500],
                ["b.png", "", "", "", "", "", "", "", "", "", 900]])
