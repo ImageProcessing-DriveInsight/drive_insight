@@ -13,13 +13,18 @@ python -m src.eval.aggregate --labels data/labels   # score results/ocr/<cond>.c
 
 ## Inputs
 
-All paths are under `results/`. Every file needs a `condition` column. A missing file leaves its columns empty, so the summary can be built before all results exist.
+All paths are under `results/`. Every file needs a `condition` column (except per-condition timing files). A missing file leaves its columns empty, so the summary can be built before all results exist.
 
 | File | From | Used columns |
 | --- | --- | --- |
 | `ocr/ocr_summary.csv` | C-09 `python -m src.eval.ocr` | `plates`, `detection_rate`, `exact_match`, `char_accuracy`, `overconfident`, `readable_wrong` |
 | `vlm/score.csv` | D-08 `score_vlm` | see below |
-| `timing.csv` | D-04 runner | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+| `timing.csv`, `<cond>/timing.csv` | D-04 runner | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+
+Timing can be one `timing.csv` or one file per condition folder, as D's runner writes it
+(`results/fixed/timing.csv`). In a per-condition file the `condition` column may be missing or
+empty; the folder name is used. The same condition and frame in two files stops the summary,
+so no frame is counted twice.
 
 ### `vlm/score.csv` (proposal for D)
 
