@@ -7,14 +7,19 @@ draft  Fill the untouched entries of B's label template (python -m tools.b_label
 check  Draw the boxes of the annotation file on a copy of each frame, with their list
        index (V0, P0), so boxes and texts can be checked by eye.
 
+--only limits either command to frames matching the patterns (e.g. "fog_*"). With
+--frames data/frames/clear it drafts the synthetic fog frames from their clear frames
+(tools/synth_fog.py reference), which have the same boxes.
+
 Check images show real plates. They go to data/annotations/check/, which git ignores.
 
 Usage:
-    python tools/label_draft.py draft [--annotations FILE] [--frames DIR] [--check DIR]
-    python tools/label_draft.py check [--annotations FILE] [--frames DIR] [--check DIR] [--only FRAME ...]
+    python tools/label_draft.py draft [--annotations FILE] [--frames DIR] [--check DIR] [--only PATTERN ...]
+    python tools/label_draft.py check [--annotations FILE] [--frames DIR] [--check DIR] [--only PATTERN ...]
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import sys
@@ -65,6 +70,15 @@ def untouched(entry):
     return entry.get("annotation_status") == "pending" and not entry.get("vehicles") and not entry.get("plates")
 
 
+def select(names, only=None):
+    """Names matching any pattern of only (all names without patterns), in their order."""
+    names = list(names)
+    for pattern in only or []:
+        if not any(fnmatch.fnmatchcase(n, pattern) for n in names):
+            raise ValueError(f"no frame matches {pattern}")
+    return [n for n in names if not only or any(fnmatch.fnmatchcase(n, p) for p in only)]
+
+
 def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -81,8 +95,8 @@ def write_json(path, data):
         Path(tmp).unlink(missing_ok=True)
 
 
-def draft(annotations=ANNOTATIONS, frames=FRAMES, check=CHECK, detector=None):
-    """Draft every untouched entry and draw its check image. Returns the drafted frame names.
+def draft(annotations=ANNOTATIONS, frames=FRAMES, check=CHECK, detector=None, only=None):
+    """Draft every untouched entry (matching only) and draw its check image. Returns the drafted names.
 
     The file is read again before each write and only a still untouched entry is filled,
     so edits made while the draft runs are kept.
@@ -90,7 +104,7 @@ def draft(annotations=ANNOTATIONS, frames=FRAMES, check=CHECK, detector=None):
     annotations, frames = Path(annotations), Path(frames)
     detector = detector or detect
     start = read_json(annotations)
-    todo = [name for name, entry in start.items() if untouched(entry)]
+    todo = [name for name in select(start, only) if untouched(start[name])]
     for n, name in enumerate(todo, 1):
         frame = load_png(frames / name)
         h, w = frame.shape[:2]
@@ -112,10 +126,10 @@ def draft(annotations=ANNOTATIONS, frames=FRAMES, check=CHECK, detector=None):
 
 
 def check_images(annotations=ANNOTATIONS, frames=FRAMES, check=CHECK, only=None):
-    """Draw the current boxes of every frame (or only those named). Returns the image paths."""
+    """Draw the current boxes of every frame (or those matching only). Returns the image paths."""
     data = read_json(annotations)
     paths = []
-    for name in only or data:
+    for name in select(data, only):
         path = Path(check) / name
         save_png(path, draw(load_png(Path(frames) / name), data[name]))
         paths.append(path)
@@ -158,11 +172,11 @@ def main():
         p.add_argument("--annotations", type=Path, default=ANNOTATIONS)
         p.add_argument("--frames", type=Path, default=FRAMES)
         p.add_argument("--check", type=Path, default=CHECK, help="folder for the check images")
-        if name == "check":
-            p.add_argument("--only", nargs="+", help="frame file names to draw (default: all)")
+        p.add_argument("--only", nargs="+", metavar="PATTERN",
+                       help='frame names or patterns, quoted, e.g. "fog_*" (default: all)')
     args = ap.parse_args()
     if args.command == "draft":
-        done = draft(args.annotations, args.frames, args.check)
+        done = draft(args.annotations, args.frames, args.check, only=args.only)
         print(f"drafted {len(done)} frames; check images in {args.check}\n{NEXT_STEPS}")
     else:
         paths = check_images(args.annotations, args.frames, args.check, args.only)
