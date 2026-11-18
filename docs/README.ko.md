@@ -18,9 +18,10 @@
 | A-09: 고정 PNG 일괄 생성, JSON 로그, 실패 복구 | — | [fixed_batch.ko.md](fixed_batch.ko.md) |
 | C-01: 검출기·OCR 비교, 버전, 라이선스 | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04\~C-08: 전처리 비교, 판정 규칙, 파이프라인, CSV 형식 | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
-| C-09: 평가 지표와 번호판 라벨 형식 제안 | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
+| C-09: 평가 지표, 번호판 매칭, 라벨 형식 | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: 조건별 `summary.csv`, `score.csv` 형식 제안 | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
 | C-11: 조건 간 개선·악화 프레임, 악화 사례 목록 | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 | 번호판 크기·화질 한계, 타임스탬프 선정 기준 | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
+| ALL-02, ALL-03: 라벨 초안과 확인 이미지 | [label_draft.md](label_draft.md) | [label_draft.ko.md](label_draft.ko.md) |
 
 계획 문서는 2026-11-16 기준 저장소 상태를 반영합니다.

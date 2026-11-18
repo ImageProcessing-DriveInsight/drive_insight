@@ -28,7 +28,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 **Week 1 (11/9–11/16): recognition on original frames**
 
 - [x] 11/9–11/10 Vehicle detection `detect_vehicles` (C-02, #10)
-- [ ] 11/9–11/14 Label own clips with B's schema (ALL-02) — blocked: no schema yet
+- [ ] 11/9–11/14 Label own clips with B's schema (ALL-02) — schema ready; drafts and check images with `tools/label_draft.py` (#54)
 - [ ] 11/10 Integration Check 1: the runner calls the stubs end to end
 - [x] 11/10–11/12 Plate candidates `detect_plate_candidates` (C-03, #10)
 - [x] 11/12–11/14 Own crop preprocessing `preprocess_plate` (C-04, #12)
@@ -81,6 +81,7 @@ python -m src.plate.run orig                   # C-08: data/frames/orig → resu
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
+python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
 ```
 
 `<samples>` has `full/`, `crops/` and `labels.csv` (`file,text`). Keep sample photos outside the repo.

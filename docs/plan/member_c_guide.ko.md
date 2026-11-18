@@ -28,7 +28,7 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 **1주차 (11/9–11/16): 원본 프레임으로 인식 완성**
 
 - [x] 11/9–11/10 차량 검출 `detect_vehicles` (C-02, #10)
-- [ ] 11/9–11/14 내 클립 정답 라벨링, B의 스키마·예시 따름 (ALL-02) — 스키마가 없어 대기
+- [ ] 11/9–11/14 내 클립 정답 라벨링, B의 스키마·예시 따름 (ALL-02) — 스키마 생김, `tools/label_draft.py`로 초안과 확인 이미지(#54)
 - [ ] 11/10 통합 점검 1: 실행기가 내 껍데기 함수를 불러 끝까지 도는지 확인
 - [x] 11/10–11/12 번호판 후보 검출 `detect_plate_candidates` (C-03, #10)
 - [x] 11/12–11/14 크롭 전처리 직접 구현 `preprocess_plate` (C-04, #12)
@@ -81,6 +81,7 @@ python -m src.plate.run orig                   # C-08: data/frames/orig → resu
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (라벨: data/labels)
+python tools/label_draft.py draft              # ALL-02: scenes.json에 박스 초안 + 확인 이미지
 ```
 
 `<samples>` 폴더에는 `full/`, `crops/`, `labels.csv`(`file,text`)가 있습니다. 샘플 사진은 저장소 밖에 둡니다.

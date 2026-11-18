@@ -18,9 +18,10 @@
 | A-09: fixed PNG batches, JSON logs and failure recovery | — | [fixed_batch.ko.md](fixed_batch.ko.md) |
 | C-01: detector and OCR comparison, versions, licenses | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
 | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
-| C-09: metrics and proposed plate label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
+| C-09: metrics, plate matching and label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: `summary.csv` per condition, proposed `score.csv` format | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
 | C-11: better and worse frames between conditions, worse-case list | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 | Plate size and degradation limits, guideline for picking timestamps | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
+| ALL-02, ALL-03: label drafts and check images | [label_draft.md](label_draft.md) | [label_draft.ko.md](label_draft.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.
