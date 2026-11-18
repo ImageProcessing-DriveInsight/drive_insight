@@ -20,7 +20,7 @@
 | C-04 to C-08: preprocessing comparison, status rules, pipeline, CSV format | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: metrics, plate matching and label format | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: `summary.csv` per condition, proposed `score.csv` format | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
-| C-11: better and worse frames between conditions, worse-case list | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
+| C-11: better and worse frames between conditions, worse-case list, images for slides | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 | Plate size and degradation limits, guideline for picking timestamps | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
 | ALL-02, ALL-03: label drafts and check images | [label_draft.md](label_draft.md) | [label_draft.ko.md](label_draft.ko.md) |
 | ALL-01: synthetic fog clips from clear-day clips | [synthetic_fog.md](synthetic_fog.md) | [synthetic_fog.ko.md](synthetic_fog.ko.md) |

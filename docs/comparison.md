@@ -53,6 +53,35 @@ Both crops are listed, so the two reads can be checked side by side.
 A frame where one plate got better and another got worse by the same amount is unchanged and not listed.
 Like `results/ocr/<cond>.csv`, this file contains plate text.
 
+## Images for slides
+
+`tools/compare_images.py` draws the plates and frames behind these numbers.
+
+```bash
+python tools/compare_images.py                      # results/figures/: better.png, worse.png, frames/
+python tools/compare_images.py --hide 2             # last 2 characters of every labeled plate covered
+python tools/compare_images.py --frames fog_01_3500 # frame images for chosen frames
+```
+
+| Image | What it shows |
+| --- | --- |
+| `better.png` | labeled plates read better in `fixed` or `adaptive` than in `orig`, largest gain first (`--top`, default 6) |
+| `worse.png` | labeled plates read worse in `fixed` or `adaptive` than in `orig`, largest loss first |
+| `frames/<frame>.png` | the whole frame in each condition side by side with its labeled plate boxes, for the frames in the two lists or `--frames` |
+
+- Each plate row has the label, then the plate area in every condition with what OCR read and the
+  char accuracy: green exact, orange partly right, red wrong or missed (`missed` = no box matched).
+- The plate area is cut at the label box plus 10 % on each side from each condition's frame, so all
+  columns show the same place, also where OCR missed the plate. Small plates are enlarged without
+  smoothing, so their real resolution shows.
+- The plates are the readable standard labeled plates found in every condition's OCR CSV, like
+  `plate_details`. `orig` and at least one other condition are needed; a missing one is left out.
+- Frames come from `data/frames/<cond>/` (`--frames-dir`), labels from `data/labels` (`--labels`).
+
+The images show real plates and go to `results/figures/`, which git ignores. For slides, use
+`--hide N` to cover the last N characters in the images and texts. It covers only labeled plates,
+by the share of characters across the label box, so check every image by eye before using it.
+
 ## Checked by hand
 
 `tests/test_compare.py` works out the counts in the docstrings: one better, one worse and one

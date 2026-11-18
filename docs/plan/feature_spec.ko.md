@@ -59,7 +59,7 @@ DriveInsight · Team 16 Black Box · **최신화 2026-11-16**
 | C-08 | 조건별 실행 | `run_ocr(cond)`, `python -m src.plate.run <cond>`: `frames/<cond>/` → `results/ocr/<cond>.csv` | `orig`, `fixed`, `adaptive`를 같은 프레임 목록으로. 번호판이 없는 프레임도 빈 행 하나 유지 | 세 CSV의 프레임 목록 일치 | 코드 완료(#14), 실행은 프레임 대기 |
 | C-09 | OCR 평가 | `eval_ocr(results, labels) -> dict`, `python -m src.eval.ocr` → `ocr_summary.csv` | 검출률(1:1, 작은 박스 기준 겹침 ≥ 0.5, IoU 큰 순서), 완전일치율, 문자 정확도(1 − 편집 거리 / 길이). unreadable 라벨은 별도 집계하고 과신 건수 보고. 표준이 아닌 번호판(광고용, 군용)은 `nonstandard_labels`로 따로 셈. `readable_wrong`, C-11용 `frame_char_accuracy`도 제공. B의 민감도 스크립트가 호출 가능 | 손으로 계산한 3건과 일치 | 완료(#16, #52). 라벨 형식은 [노트](../ocr_evaluation.ko.md), B의 라벨 내보내기가 이 형식으로 씀 |
 | C-10 | 전체 집계 | `aggregate(results_dir, labels=None) -> summary.csv`, `python -m src.eval.aggregate` | OCR 지표, D의 VLM 점수, `timing.csv`를 조건별로 합침 | 원본 CSV들과 수치 일치 | 완료(#24): VLM 개수는 클립을 합쳐 계산, 없는 파일은 해당 열을 빈 값으로 둠. `score.csv` 형식은 [노트](../aggregation.ko.md)에 제안 |
-| C-11 | 조건 간 비교표 | `compare(results_dir, labels) -> (비교표, 사례 목록)`, `write_compare` → `compare.csv`, `worse_cases.csv` | `orig` 대 `fixed`, `fixed` 대 `adaptive`에서 프레임별 개선·악화 건수를 모두 표시. 악화 사례는 크롭 경로와 함께 출력 | 개선 + 악화 + 변화 없음 = 전체 프레임 수 | 완료(#26): 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 셈. 시그니처는 11/17 확정. [노트](../comparison.ko.md) |
+| C-11 | 조건 간 비교표 | `compare(results_dir, labels) -> (비교표, 사례 목록)`, `write_compare` → `compare.csv`, `worse_cases.csv` | `orig` 대 `fixed`, `fixed` 대 `adaptive`에서 프레임별 개선·악화 건수를 모두 표시. 악화 사례는 크롭 경로와 함께 출력 | 개선 + 악화 + 변화 없음 = 전체 프레임 수 | 완료(#26): 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 셈. 시그니처는 11/17 확정. 발표용 이미지: `tools/compare_images.py`(#63). [노트](../comparison.ko.md) |
 
 ## 팀원 D · 실험 실행기 + VLM + 실행 환경
 
