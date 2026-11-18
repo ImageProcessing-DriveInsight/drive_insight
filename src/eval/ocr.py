@@ -1,8 +1,9 @@
 """OCR evaluation against plate labels (C-09).
 
-Plate label format (proposed until the team label schema is fixed): a JSON
-object mapping each frame file name to its plates. A folder of such files is
-merged. text null means the plate is not readable by eye.
+Plate label format (what `python -m tools.b_labels export` writes to
+data/labels/plates.json): a JSON object mapping each frame file name to its
+plates. A folder of such files is merged. text null means the plate is not
+readable by eye.
 
     {"fog_01_3500.png": [{"bbox": [x, y, w, h], "text": "12가3456"},
                          {"bbox": [x, y, w, h], "text": null}],
@@ -17,11 +18,14 @@ import csv
 import json
 from pathlib import Path
 
+from src.plate.judge import PLATE_RE
+
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("orig", "fixed", "adaptive")
 MATCH_OVERLAP = 0.5  # share of the smaller box that must overlap
 OCR_METRICS = ["detection_rate", "exact_match", "char_accuracy", "overconfident"]
-SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", *OCR_METRICS, "readable_wrong", "missing_frames"]
+SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", "nonstandard_labels", *OCR_METRICS,
+                  "readable_wrong", "missing_frames"]
 
 
 def intersection(a, b):  # (x, y, w, h)
@@ -57,6 +61,15 @@ def char_accuracy(pred, label):
 
 def frame_key(name):
     return Path(str(name)).stem  # "x.png" and "x" are the same frame
+
+
+def is_standard(text):
+    """True for a plate text the judge can call readable (see src.plate.judge).
+
+    Carmaker advertising plates (123케4567), military and diplomatic plates are real but
+    use other characters or formats, so a read of them can never be right.
+    """
+    return bool(PLATE_RE.match(text))
 
 
 def load_labels(labels):
@@ -113,7 +126,7 @@ def match_frame(preds, labels):
 def score(results, labels):
     """Returns (summary dict, {frame: mean char accuracy of its readable labels, or None})."""
     preds, gold = load_results(results), load_labels(labels)
-    plates = detected = exact = unreadable = overconfident = readable_wrong = missing = 0
+    plates = detected = exact = unreadable = nonstandard = overconfident = readable_wrong = missing = 0
     accs, frames = [], {}
     for frame, labs in gold.items():
         missing += frame not in preds
@@ -124,6 +137,10 @@ def score(results, labels):
             if lab["text"] is None:  # not readable by eye: only check for confident answers
                 unreadable += 1
                 overconfident += p is not None and p["status"] == "readable"
+                continue
+            if not is_standard(lab["text"]):  # a readable answer here is always wrong
+                nonstandard += 1
+                readable_wrong += p is not None and p["status"] == "readable"
                 continue
             plates += 1
             detected += p is not None
@@ -136,6 +153,7 @@ def score(results, labels):
         "frames": len(gold),
         "plates": plates,
         "unreadable_labels": unreadable,
+        "nonstandard_labels": nonstandard,
         "detection_rate": detected / plates if plates else None,
         "exact_match": exact / plates if plates else None,
         "char_accuracy": sum(accs) / plates if plates else None,
@@ -154,22 +172,23 @@ def eval_ocr(results, labels) -> dict:
         labels: dict, JSON file or folder in the plate label format above.
 
     Returns:
-        {"frames", "plates", "unreadable_labels", "detection_rate", "exact_match",
-         "char_accuracy", "overconfident", "readable_wrong", "missing_frames"}.
+        {"frames", "plates", "unreadable_labels", "nonstandard_labels", "detection_rate",
+         "exact_match", "char_accuracy", "overconfident", "readable_wrong", "missing_frames"}.
         Rates are None when there is no readable labeled plate.
         Labels with text None are left out of the three rates; "overconfident"
-        counts those that were read as readable.
+        counts those that were read as readable. Labels that are not standard plates
+        (is_standard) are left out too; a readable answer on one counts as readable_wrong.
     """
     return score(results, labels)[0]
 
 
 def frame_char_accuracy(results, labels) -> dict:
-    """{frame: mean char accuracy of its readable labeled plates, or None if it has none}."""
+    """{frame: mean char accuracy of its readable standard labeled plates, or None if it has none}."""
     return score(results, labels)[1]
 
 
 def plate_details(results, labels) -> dict:
-    """{frame: [{"label", "text", "status", "crop_path", "char_acc"}]}, one entry per readable labeled plate.
+    """{frame: [{"label", "text", "status", "crop_path", "char_acc"}]}, one entry per readable standard labeled plate.
 
     A missed plate has text, status and crop_path None and char_acc 0. Frames missing from the
     results are left out; frames without a readable labeled plate map to [].
@@ -183,7 +202,7 @@ def plate_details(results, labels) -> dict:
         matched = match_frame(preds[frame], labs)
         plates = []
         for i, lab in enumerate(labs):
-            if lab["text"] is None:
+            if lab["text"] is None or not is_standard(lab["text"]):
                 continue
             p = matched.get(i) or {}
             plates.append({"label": lab["text"], "text": p.get("text"), "status": p.get("status"),
