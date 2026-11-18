@@ -23,5 +23,6 @@
 | C-11: better and worse frames between conditions, worse-case list | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 | Plate size and degradation limits, guideline for picking timestamps | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
 | ALL-02, ALL-03: label drafts and check images | [label_draft.md](label_draft.md) | [label_draft.ko.md](label_draft.ko.md) |
+| ALL-01: synthetic fog clips from clear-day clips | [synthetic_fog.md](synthetic_fog.md) | [synthetic_fog.ko.md](synthetic_fog.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.

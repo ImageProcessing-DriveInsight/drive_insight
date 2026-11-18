@@ -21,7 +21,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 
 **Weekend (11/7–11/8)**
 
-- [ ] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01)
+- [ ] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01) — no public fog footage with readable plates; synthetic fog on clear-day clips with `tools/synth_fog.py` (#61), snow not synthesized
 - [x] Commit stubs: `detect_plates(frame) -> []`, `eval_ocr`, `aggregate` (#2)
 - [x] Install detectors and OCR, test 10 Korean plate photos, write the selection memo (C-01, #4, #8)
 
@@ -82,6 +82,7 @@ python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv �
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
 python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
+python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
 ```
 
 `<samples>` has `full/`, `crops/` and `labels.csv` (`file,text`). Keep sample photos outside the repo.

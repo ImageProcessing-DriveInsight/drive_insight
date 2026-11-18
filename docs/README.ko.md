@@ -23,5 +23,6 @@
 | C-11: 조건 간 개선·악화 프레임, 악화 사례 목록 | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
 | 번호판 크기·화질 한계, 타임스탬프 선정 기준 | [plate_size_check.md](plate_size_check.md) | [plate_size_check.ko.md](plate_size_check.ko.md) |
 | ALL-02, ALL-03: 라벨 초안과 확인 이미지 | [label_draft.md](label_draft.md) | [label_draft.ko.md](label_draft.ko.md) |
+| ALL-01: 맑은 날 영상으로 만드는 합성 안개 클립 | [synthetic_fog.md](synthetic_fog.md) | [synthetic_fog.ko.md](synthetic_fog.ko.md) |
 
 계획 문서는 2026-11-16 기준 저장소 상태를 반영합니다.
