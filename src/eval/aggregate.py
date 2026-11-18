@@ -4,7 +4,7 @@ Reads, under results_dir:
     ocr/ocr_summary.csv   OCR metrics per condition (python -m src.eval.ocr, C-09),
                           or ocr/<cond>.csv scored against labels when labels are given
     vlm/score.csv         VLM scores (D-08), one row per condition or per condition and clip
-    timing.csv            step times per frame (D-04)
+    timing.csv            step times per frame (D-04), and/or <cond>/timing.csv per condition
 and writes summary.csv with one row per condition. A missing source leaves its columns empty.
 
 Usage:
@@ -39,7 +39,11 @@ def mean(values):
     return sum(values) / len(values) if values else None
 
 
-def read_rows(path):
+def read_rows(path, condition=None):
+    """Rows of a CSV with a condition column; [] if the file is missing or empty.
+
+    With condition given, the column may be missing and empty cells take that condition.
+    """
     path = Path(path)
     if not path.exists():
         return []
@@ -47,9 +51,13 @@ def read_rows(path):
         reader = csv.DictReader(f)
         if reader.fieldnames is None:  # empty file
             return []
-        if "condition" not in reader.fieldnames:
+        if "condition" not in reader.fieldnames and condition is None:
             raise ValueError(f"{path}: needs a 'condition' column")
-        return list(reader)
+        rows = list(reader)
+    if condition is not None:
+        for r in rows:
+            r["condition"] = (r.get("condition") or "").strip() or condition
+    return rows
 
 
 def by_condition(rows):
@@ -92,10 +100,29 @@ def vlm_metrics(path):
     return out
 
 
-def time_metrics(path):
+def timing_rows(results_dir):
+    """Rows of timing.csv and of every <cond>/timing.csv under results_dir.
+
+    D's runner (D-04) writes one file per condition folder; a row there without a condition
+    takes the folder name. The same condition and frame twice is an error, so no frame counts twice.
+    """
+    results_dir = Path(results_dir)
+    rows = read_rows(results_dir / "timing.csv")
+    for path in sorted(results_dir.glob("*/timing.csv")):
+        rows += read_rows(path, condition=path.parent.name)
+    seen = set()
+    for r in rows:
+        key = (r["condition"].strip(), (r.get("frame") or "").strip())
+        if key[1] and key in seen:
+            raise ValueError(f"timing of {key[1]} in {key[0]} appears twice under {results_dir}")
+        seen.add(key)
+    return rows
+
+
+def time_metrics(rows):
     """{cond: mean ms per frame for each step}. Empty cells are skipped, e.g. vlm_ms on frames without a VLM call."""
     return {cond: {k: mean(num(r.get(k)) for r in rs) for k in TIME_COLUMNS}
-            for cond, rs in by_condition(read_rows(path)).items()}
+            for cond, rs in by_condition(rows).items()}
 
 
 def summarize(results_dir, labels=None):
@@ -103,7 +130,7 @@ def summarize(results_dir, labels=None):
     results_dir = Path(results_dir)
     sources = [ocr_metrics(results_dir, labels),
                vlm_metrics(results_dir / "vlm" / "score.csv"),
-               time_metrics(results_dir / "timing.csv")]
+               time_metrics(timing_rows(results_dir))]
     found = {cond for s in sources for cond in s}
     order = [c for c in CONDITIONS if c in found] + sorted(found - set(CONDITIONS))
     rows = []
@@ -128,7 +155,7 @@ def aggregate(results_dir, labels=None) -> Path:
     """Write <results_dir>/summary.csv with one row per condition.
 
     Args:
-        results_dir: folder with ocr/, vlm/score.csv and timing.csv.
+        results_dir: folder with ocr/, vlm/score.csv and timing.csv or <cond>/timing.csv.
         labels: optional plate labels (see src.eval.ocr). If given, ocr/<cond>.csv is
             scored again instead of reading ocr/ocr_summary.csv.
 
