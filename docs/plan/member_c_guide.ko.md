@@ -83,6 +83,7 @@ python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/scor
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (라벨: data/labels)
 python tools/label_draft.py draft              # ALL-02: scenes.json에 박스 초안 + 확인 이미지
 python tools/synth_fog.py make <clear> <out>   # ALL-01: 맑은 날 영상으로 안개 클립 생성
+python tools/compare_images.py                 # C-11: 발표용 번호판·프레임 이미지 (--hide 2)
 ```
 
 `<samples>` 폴더에는 `full/`, `crops/`, `labels.csv`(`file,text`)가 있습니다. 샘플 사진은 저장소 밖에 둡니다.

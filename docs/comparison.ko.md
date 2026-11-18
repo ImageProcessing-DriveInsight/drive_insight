@@ -53,6 +53,35 @@ python -m src.eval.compare --labels data/labels    # C-11: compare.csv, worse_ca
 한 번호판은 좋아지고 다른 번호판은 같은 만큼 나빠진 프레임은 변화 없음이며 목록에 나오지 않습니다.
 `results/ocr/<cond>.csv`와 마찬가지로 이 파일에는 번호판 글자가 들어 있습니다.
 
+## 발표용 이미지
+
+`tools/compare_images.py`는 이 숫자 뒤의 번호판과 프레임을 그림으로 보여 줍니다.
+
+```bash
+python tools/compare_images.py                      # results/figures/: better.png, worse.png, frames/
+python tools/compare_images.py --hide 2             # 라벨 번호판마다 마지막 2글자를 가림
+python tools/compare_images.py --frames fog_01_3500 # 고른 프레임의 프레임 이미지
+```
+
+| 이미지 | 내용 |
+| --- | --- |
+| `better.png` | `fixed`나 `adaptive`에서 `orig`보다 잘 읽힌 라벨 번호판, 많이 좋아진 순(`--top`, 기본 6개) |
+| `worse.png` | `fixed`나 `adaptive`에서 `orig`보다 못 읽힌 라벨 번호판, 많이 나빠진 순 |
+| `frames/<frame>.png` | 두 목록에 나온 프레임(또는 `--frames`)을 조건별로 나란히, 라벨 번호판 박스와 함께 |
+
+- 번호판 한 줄에는 라벨, 그리고 조건마다 번호판 영역과 OCR이 읽은 글자, 문자 정확도가 나옵니다.
+  초록은 완전일치, 주황은 일부 맞음, 빨강은 틀림이나 놓침입니다(`missed`는 짝지어진 박스가 없음).
+- 번호판 영역은 조건마다 프레임에서 라벨 박스에 사방 10 %를 더해 잘라 냅니다. 그래서 모든 열이
+  같은 곳을 보여 주고, OCR이 놓친 번호판도 보입니다. 작은 번호판은 부드럽게 하지 않고 키워서
+  실제 해상도가 그대로 보입니다.
+- 대상은 모든 조건의 OCR CSV에 있는, 읽을 수 있는 표준 라벨 번호판입니다(`plate_details`와 같음).
+  `orig`과 다른 조건 하나 이상이 있어야 하고, 없는 조건은 빠집니다.
+- 프레임은 `data/frames/<cond>/`(`--frames-dir`), 라벨은 `data/labels`(`--labels`)에서 읽습니다.
+
+이미지에는 실제 번호판이 보이므로 git이 무시하는 `results/figures/`에 저장됩니다. 발표 자료에는
+`--hide N`으로 이미지와 글자의 마지막 N글자를 가리세요. 라벨 번호판만, 라벨 박스를 글자 수 비율로
+나눠 가리므로 쓰기 전에 이미지를 하나씩 눈으로 확인하세요.
+
 ## 손으로 확인한 경우
 
 `tests/test_compare.py`의 docstring에 계산 과정을 적어 두었습니다. 개선·악화·변화 없음 프레임

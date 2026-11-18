@@ -83,6 +83,7 @@ python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/scor
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
 python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
+python tools/compare_images.py                 # C-11: plate and frame images for slides (--hide 2)
 ```
 
 `<samples>` has `full/`, `crops/` and `labels.csv` (`file,text`). Keep sample photos outside the repo.
