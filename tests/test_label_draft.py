@@ -101,3 +101,15 @@ def test_check_images(labeling):
     frames, annotations, check = labeling
     paths = check_images(annotations, frames, check, only=["b.png"])
     assert paths == [check / "b.png"] and load_png(paths[0]).shape == (H, W, 3)
+    assert check_images(annotations, frames, check, only=["*.png"]) == [check / "a.png", check / "b.png"]
+
+
+def test_draft_only_matching_frames_from_another_folder(labeling, tmp_path):
+    frames, annotations, check = labeling
+    clear = tmp_path / "clear"  # like data/frames/clear: only some frames, same names and size
+    save_png(clear / "b.png", np.full((H, W, 3), 200, np.uint8))
+    assert draft(annotations, clear, check, detector=fake_detector, only=["b*"]) == ["b.png"]
+    data = json.loads(annotations.read_text(encoding="utf-8"))
+    assert untouched(data["a.png"]) and not untouched(data["b.png"])
+    with pytest.raises(ValueError, match="fog_"):
+        draft(annotations, clear, check, detector=fake_detector, only=["fog_*"])
