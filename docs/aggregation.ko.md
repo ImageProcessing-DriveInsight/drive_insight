@@ -13,13 +13,17 @@ python -m src.eval.aggregate --labels data/labels   # results/ocr/<cond>.csv를 
 
 ## 입력
 
-모든 경로는 `results/` 아래입니다. 모든 파일에 `condition` 열이 있어야 합니다. 파일이 없으면 해당 열만 빈 값으로 두므로, 결과가 다 모이기 전에도 요약을 만들 수 있습니다.
+모든 경로는 `results/` 아래입니다. 모든 파일에 `condition` 열이 있어야 합니다(조건별 시간 파일은 예외). 파일이 없으면 해당 열만 빈 값으로 두므로, 결과가 다 모이기 전에도 요약을 만들 수 있습니다.
 
 | 파일 | 만드는 곳 | 쓰는 열 |
 | --- | --- | --- |
 | `ocr/ocr_summary.csv` | C-09 `python -m src.eval.ocr` | `plates`, `detection_rate`, `exact_match`, `char_accuracy`, `overconfident`, `readable_wrong` |
 | `vlm/score.csv` | D-08 `score_vlm` | 아래 참고 |
-| `timing.csv` | D-04 실행기 | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+| `timing.csv`, `<cond>/timing.csv` | D-04 실행기 | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+
+시간은 `timing.csv` 하나여도 되고, D의 실행기처럼 조건 폴더마다 하나씩(`results/fixed/timing.csv`)
+있어도 됩니다. 조건별 파일에서는 `condition` 열이 없거나 비어 있어도 되고, 그때는 폴더 이름을 씁니다.
+같은 조건·프레임이 두 파일에 있으면 요약을 멈춰서, 한 프레임이 두 번 세어지지 않게 합니다.
 
 ### `vlm/score.csv` (D에게 제안하는 형식)
 
