@@ -124,7 +124,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 
 ### C-09 Evaluation — `src/eval/ocr.py`, [docs/ocr_evaluation.md](../ocr_evaluation.md)
 
-- One-to-one matching with IoU ≥ 0.5, highest first; detection rate, exact match, char accuracy over readable labels.
+- One-to-one matching when the boxes overlap by ≥ 0.5 of the smaller box, highest IoU first; detection rate, exact match, char accuracy over readable standard labels. Non-standard plates (advertising, military) are counted apart (#52).
 - Unreadable labels counted apart with `overconfident`; also `readable_wrong` and `missing_frames`.
 - `frame_char_accuracy` gives per-frame scores for C-11.
 - Three hand-computed cases in `tests/test_ocr_eval.py`.

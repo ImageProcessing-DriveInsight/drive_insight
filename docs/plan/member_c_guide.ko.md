@@ -124,7 +124,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 
 ### C-09 평가 — `src/eval/ocr.py`, [docs/ocr_evaluation.ko.md](../ocr_evaluation.ko.md)
 
-- IoU ≥ 0.5, 1:1, 큰 순서로 짝짓고, 읽을 수 있는 라벨 기준으로 검출률·완전일치율·문자 정확도를 계산합니다.
+- 두 박스가 작은 박스의 절반 이상 겹치면 IoU 큰 순서로 1:1로 짝짓고, 읽을 수 있는 표준 라벨 기준으로 검출률·완전일치율·문자 정확도를 계산합니다. 표준이 아닌 번호판(광고용, 군용)은 따로 셉니다(#52).
 - unreadable 라벨은 따로 세고 과신 건수(`overconfident`)를 보고합니다. `readable_wrong`, `missing_frames`도 있습니다.
 - `frame_char_accuracy`는 C-11에서 쓸 프레임별 점수입니다.
 - 손으로 계산한 3건이 `tests/test_ocr_eval.py`에 있습니다.
