@@ -21,7 +21,7 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 
 **주말 (11/7–11/8)**
 
-- [ ] 안개·눈 클립 2–3개 업로드, 출처·라이선스·타임스탬프 3–5개 기록. 절반 이상은 번호판이 보이는 장면 (ALL-01)
+- [ ] 안개·눈 클립 2–3개 업로드, 출처·라이선스·타임스탬프 3–5개 기록. 절반 이상은 번호판이 보이는 장면 (ALL-01) — 번호판이 읽히는 공개 안개 영상이 없어 맑은 날 영상에 `tools/synth_fog.py`로 합성 안개(#61), 눈은 합성 안 함
 - [x] 함수 껍데기 커밋: `detect_plates(frame) -> []`, `eval_ocr`, `aggregate` (#2)
 - [x] 차량 검출기·번호판 검출기·OCR 설치, 한국 번호판 사진 10장 테스트, 선정 메모 작성 (C-01, #4, #8)
 
@@ -82,6 +82,7 @@ python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv �
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (라벨: data/labels)
 python tools/label_draft.py draft              # ALL-02: scenes.json에 박스 초안 + 확인 이미지
+python tools/synth_fog.py make <clear> <out>   # ALL-01: 맑은 날 영상으로 안개 클립 생성
 ```
 
 `<samples>` 폴더에는 `full/`, `crops/`, `labels.csv`(`file,text`)가 있습니다. 샘플 사진은 저장소 밖에 둡니다.

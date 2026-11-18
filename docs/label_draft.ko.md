@@ -16,6 +16,9 @@ python -m tools.b_labels export      # B: OCR 평가용 data/labels/plates.json 
 ```
 
 경로 기본값은 `data/...`입니다. `--annotations`, `--frames`, `--check`로 바꿀 수 있습니다.
+`--only`는 `draft`와 `check`를 프레임 이름이나 따옴표로 감싼 패턴(`"fog_*"` 등)에 맞는 것만 처리하게 합니다.
+합성 안개 프레임은 맑은 프레임으로 초안을 만들 수 있습니다:
+`draft --frames data/frames/clear --only "fog_*"` ([합성 안개](synthetic_fog.ko.md)).
 
 ## 초안이 채우는 것
 

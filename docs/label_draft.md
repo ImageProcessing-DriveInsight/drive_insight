@@ -16,6 +16,9 @@ python -m tools.b_labels export      # B: data/labels/plates.json for the OCR ev
 ```
 
 Paths default to `data/...`. `--annotations`, `--frames` and `--check` change them.
+`--only` limits `draft` and `check` to frame names or quoted patterns such as `"fog_*"`.
+Synthetic fog frames can be drafted from their clear frames:
+`draft --frames data/frames/clear --only "fog_*"` ([synthetic fog](synthetic_fog.md)).
 
 ## What the draft fills
 
