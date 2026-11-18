@@ -188,7 +188,8 @@ def frame_char_accuracy(results, labels) -> dict:
 
 
 def plate_details(results, labels) -> dict:
-    """{frame: [{"label", "text", "status", "crop_path", "char_acc"}]}, one entry per readable standard labeled plate.
+    """{frame: [{"label", "label_bbox", "text", "status", "crop_path", "char_acc"}]}, one entry per readable
+    standard labeled plate.
 
     A missed plate has text, status and crop_path None and char_acc 0. Frames missing from the
     results are left out; frames without a readable labeled plate map to [].
@@ -205,8 +206,8 @@ def plate_details(results, labels) -> dict:
             if lab["text"] is None or not is_standard(lab["text"]):
                 continue
             p = matched.get(i) or {}
-            plates.append({"label": lab["text"], "text": p.get("text"), "status": p.get("status"),
-                           "crop_path": p.get("crop_path"),
+            plates.append({"label": lab["text"], "label_bbox": lab["bbox"], "text": p.get("text"),
+                           "status": p.get("status"), "crop_path": p.get("crop_path"),
                            "char_acc": char_accuracy(p.get("text"), lab["text"]) if p else 0.0})
         out[frame] = plates
     return out
