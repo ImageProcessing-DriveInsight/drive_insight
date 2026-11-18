@@ -19,17 +19,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("orig", "fixed", "adaptive")
-IOU_MATCH = 0.5
+MATCH_OVERLAP = 0.5  # share of the smaller box that must overlap
 OCR_METRICS = ["detection_rate", "exact_match", "char_accuracy", "overconfident"]
 SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", *OCR_METRICS, "readable_wrong", "missing_frames"]
 
 
-def iou(a, b):  # (x, y, w, h)
+def intersection(a, b):  # (x, y, w, h)
     ix = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
     iy = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
-    inter = ix * iy
+    return ix * iy
+
+
+def iou(a, b):
+    inter = intersection(a, b)
     union = a[2] * a[3] + b[2] * b[3] - inter
     return inter / union if union > 0 else 0.0
+
+
+def overlap(a, b):
+    """Intersection over the smaller box: 1.0 when one box lies inside the other."""
+    smaller = min(a[2] * a[3], b[2] * b[3])
+    return intersection(a, b) / smaller if smaller > 0 else 0.0
 
 
 def edit_distance(a, b):  # Levenshtein
@@ -83,14 +93,17 @@ def load_results(results):
 
 
 def match_frame(preds, labels):
-    """One-to-one matching with IoU >= IOU_MATCH, highest IoU first. Returns {label index: pred}."""
-    pairs = sorted(((iou(p["bbox"], lab["bbox"]), -i, -j) for j, p in enumerate(preds) for i, lab in enumerate(labels)),
-                   reverse=True)
+    """One-to-one matching. Returns {label index: pred}.
+
+    A pair qualifies when the boxes overlap by at least MATCH_OVERLAP of the smaller box, so a
+    box that is only tighter or looser than the label still counts. Qualifying pairs are taken
+    highest IoU first, so the box closest in size wins.
+    """
+    pairs = sorted(((iou(p["bbox"], lab["bbox"]), -i, -j) for j, p in enumerate(preds) for i, lab in enumerate(labels)
+                    if overlap(p["bbox"], lab["bbox"]) >= MATCH_OVERLAP), reverse=True)
     used_p, matched = set(), {}
-    for v, i, j in pairs:
+    for _, i, j in pairs:
         i, j = -i, -j
-        if v < IOU_MATCH:
-            break
         if i not in matched and j not in used_p:
             matched[i] = preds[j]
             used_p.add(j)
