@@ -9,6 +9,7 @@
 | Roles, interfaces, folders, WBS, schedule, risks | [team_plan.md](plan/team_plan.md) | [team_plan.ko.md](plan/team_plan.ko.md) |
 | Feature spec by member, with status | [feature_spec.md](plan/feature_spec.md) | [feature_spec.ko.md](plan/feature_spec.ko.md) |
 | Member C guide: plate recognition and evaluation | [member_c_guide.md](plan/member_c_guide.md) | [member_c_guide.ko.md](plan/member_c_guide.ko.md) |
+| Member C talk script, 5 minutes | — | [member_c_talk.ko.md](plan/member_c_talk.ko.md) |
 
 ## Technical notes
 

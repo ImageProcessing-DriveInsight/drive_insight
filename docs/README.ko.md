@@ -9,6 +9,7 @@
 | 역할 분담, 인터페이스, 폴더 구조, WBS, 일정, 리스크 | [team_plan.md](plan/team_plan.md) | [team_plan.ko.md](plan/team_plan.ko.md) |
 | 팀원별 기능 명세와 진행 상태 | [feature_spec.md](plan/feature_spec.md) | [feature_spec.ko.md](plan/feature_spec.ko.md) |
 | 팀원 C 작업 가이드: 번호판 인식과 평가 | [member_c_guide.md](plan/member_c_guide.md) | [member_c_guide.ko.md](plan/member_c_guide.ko.md) |
+| 팀원 C 발표 원고(5분) | — | [member_c_talk.ko.md](plan/member_c_talk.ko.md) |
 
 ## 기술 노트
 
