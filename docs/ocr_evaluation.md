@@ -73,6 +73,14 @@ Rates are empty when there is no readable standard labeled plate.
 `frame_char_accuracy(results, labels)` gives the mean char accuracy per frame for the
 condition comparison (C-11). Frames without a readable standard labeled plate get `None`.
 
+## Clear reference (#79)
+
+`results/ocr/clear.csv` is OCR on the clear frames the synthetic fog clips were made from
+(`python -m src.plate.run clear`). `python -m src.eval.ocr` adds a `clear` row after the three
+conditions and scores it only on the labeled frames in that file (`eval_conditions`): frames of
+other conditions have no clear frame and would otherwise count as missed plates. On a set of only
+synthetic fog frames, `clear` and the conditions cover the same plates.
+
 ## Checked by hand
 
 `tests/test_ocr_eval.py` has three cases worked out by hand in the docstrings:

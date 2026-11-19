@@ -53,7 +53,7 @@ D의 실행기가 시간 파일을 쓰기 전까지, 시간 파일이 없는 조
 
 | 열 | 의미 |
 | --- | --- |
-| `condition` | `orig`, `fixed`, `adaptive` 순서, 그 밖의 값은 뒤에 |
+| `condition` | `orig`, `fixed`, `adaptive` 순서, 그 밖의 값은 뒤에. 예: 맑은 기준 `clear`([OCR 평가](ocr_evaluation.ko.md#맑은-기준-79)) |
 | `plates` | 읽을 수 있는 라벨 번호판 수(OCR 비율의 분모) |
 | `detection_rate`, `exact_match`, `char_accuracy` | 0–1, [ocr_evaluation.ko.md](ocr_evaluation.ko.md) 참고 |
 | `overconfident`, `readable_wrong` | 개수 |

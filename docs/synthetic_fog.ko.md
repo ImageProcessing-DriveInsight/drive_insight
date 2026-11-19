@@ -60,6 +60,8 @@ python tools/synth_fog.py make data/clear/day_01.mp4 data/clips/fog_01.mp4 --hor
 python tools/synth_fog.py reference data/clips/fog_01.mp4
 # 5. 맑은 프레임으로 라벨 초안 (박스 위치는 같고 검출은 더 잘 됨)
 python tools/label_draft.py draft --frames data/frames/clear --only "fog_*"
+# 6. orig, fixed, adaptive OCR 뒤에: 맑은 프레임을 기준으로 (results/ocr/clear.csv, #79)
+python -m src.plate.run clear
 ```
 
 - 지평선 행은 도로가 하늘과 만나거나 사라지는 곳에 맞춥니다. 너무 낮으면 가까운 도로까지 뿌옇고,

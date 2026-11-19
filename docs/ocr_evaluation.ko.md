@@ -70,6 +70,13 @@ B의 라벨 도구가 이 형식으로 씁니다. `python -m tools.b_labels expo
 `frame_char_accuracy(results, labels)`는 조건 비교(C-11)에 쓰도록 프레임별 평균 문자 정확도를 냅니다.
 읽을 수 있는 표준 라벨 번호판이 없는 프레임은 `None`입니다.
 
+## 맑은 기준 (#79)
+
+`results/ocr/clear.csv`는 합성 안개 클립을 만든 맑은 프레임에 OCR을 돌린 결과입니다(`python -m src.plate.run clear`).
+`python -m src.eval.ocr`는 세 조건 뒤에 `clear` 행을 붙이고, 그 파일에 있는 라벨 프레임만으로 채점합니다
+(`eval_conditions`). 다른 조건의 프레임에는 맑은 프레임이 없어서, 그대로 두면 놓친 번호판으로 세어지기 때문입니다.
+합성 안개 프레임만 있는 평가 세트에서는 `clear`와 세 조건이 같은 번호판을 다룹니다.
+
 ## 손으로 확인한 경우
 
 `tests/test_ocr_eval.py`에는 손으로 계산한 3가지 경우가 docstring에 정리되어 있습니다.

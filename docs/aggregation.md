@@ -55,7 +55,7 @@ One row per condition and clip. Empty or `N/A` means not available.
 
 | Column | Meaning |
 | --- | --- |
-| `condition` | `orig`, `fixed`, `adaptive` first, then any other value found |
+| `condition` | `orig`, `fixed`, `adaptive` first, then any other value found, e.g. the `clear` reference ([OCR evaluation](ocr_evaluation.md#clear-reference-79)) |
 | `plates` | readable labeled plates (denominator of the OCR rates) |
 | `detection_rate`, `exact_match`, `char_accuracy` | 0–1, see [ocr_evaluation.md](ocr_evaluation.md) |
 | `overconfident`, `readable_wrong` | counts |
