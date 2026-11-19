@@ -79,7 +79,8 @@ Otsu binarization breaks thin strokes and loses most reads.
 
 - PaddleOCR `korean` (see [model_selection.md](model_selection.md))
 - Boxes are joined top-to-bottom, then left-to-right (two-line plates)
-- `O`→`0` and `I`/`l`→`1` (plates have no Latin letters), then only digits and Hangul are kept
+- `O`→`0` and `I`/`l`→`1` (Korean plates have no Latin letters), then only digits and Hangul are kept
+- US plates follow other rules, see [US plates](#us-plates)
 - Confidence is the lowest box score
 
 ## Status (C-06)
@@ -123,3 +124,44 @@ These stay uncertain, never readable.
 | `123456` (Hangul dropped) | 0.90 | uncertain | `12?3456` |
 | `12가34567` (one extra digit, could be any) | 0.90 | unreadable | `None` |
 | any | < 0.5 | unreadable | `None` |
+
+## US plates
+
+Clips with US plates (e.g. BDD100K) are listed in `data/plate_countries.json`. Each key is a country,
+each value a list of frame name patterns (`fnmatch`, case-sensitive) matched against the name
+without its extension. Frames are named `<clip>_<ms>`, so a clip prefix selects the whole clip.
+A frame that matches nothing is Korean, and without the file every frame is Korean.
+A frame that matches the patterns of two countries is an error.
+
+```json
+{"us": ["bdd_*"]}
+```
+
+`python -m src.plate.run` and `python -m src.eval.ocr` read this file (`--countries FILE` points to
+another one). The aggregate (`--labels`), the condition comparison and the comparison images score
+labels through the same functions, so they read it too.
+
+| Step | Korean (`kr`) | US (`us`) |
+| --- | --- | --- |
+| OCR model | PaddleOCR `korean` | the same model; its dictionary also has A–Z |
+| Text kept | digits and Hangul, after `O`→`0`, `I`/`l`→`1` | upper-case letters and digits; `O` and `I` stay letters |
+| Lines | all lines, top to bottom (two-line plates) | only the plate number line: the line of the tallest box, and in it only boxes at least 0.7 as tall. State names, slogans and stickers are smaller |
+| Standard format | see Status above | 5–7 letters and digits with at least one digit, e.g. `7ABC123`, `KDE4821`, `A12BCD`, `123456` |
+| uncertain | standard format with conf < 0.8, or one fix | standard format with conf < 0.8 only. Formats differ by state, so no position can be marked with `?` |
+
+Letters-only vanity plates (`GOBEARS`) and plates longer than 7 characters are real but not
+standard. Like Korean advertising plates, they are never readable and are left out of the OCR
+rates ([ocr_evaluation.md](ocr_evaluation.md)).
+
+Check with rendered plates (state name above, slogan below: `7ABC123`, `KDE4821`, `ABC1234`):
+all 12 reads at 300, 120, 80 and 60 px plate width were readable and exact. The Korean rules read
+the same crops as digits only (e.g. `07123`). These are clean renders, not real footage.
+
+Watch out on real clips:
+
+- US plates are 305 mm wide against 520 mm for Korean long plates, and BDD100K is 720p. A plate at
+  the same distance is about 0.4 times as wide in pixels. Check plate widths on the frames before
+  choosing timestamps ([plate_size_check.md](plate_size_check.md)).
+- The candidate search (C-03) already tries 2:1 boxes (`ASPECTS`), but its settings were tuned on
+  Korean plates.
+- Compare the conditions (`orig`, `fixed`, `adaptive`) of a clip, not US clips against Korean ones.
