@@ -9,8 +9,11 @@ readable by eye.
                          {"bbox": [x, y, w, h], "text": null}],
      "fog_01_7000.png": []}
 
+A US plate (frames listed in data/plate_countries.json, see src.plate.country) is written in
+upper-case letters and digits without spaces, e.g. "7ABC123".
+
 Usage:
-    python -m src.eval.ocr [--labels data/labels] [--results results]
+    python -m src.eval.ocr [--labels data/labels] [--results results] [--countries FILE]
 """
 
 import argparse
@@ -18,7 +21,8 @@ import csv
 import json
 from pathlib import Path
 
-from src.plate.judge import PLATE_RE
+from src.plate.country import country_of, load_countries
+from src.plate.judge import is_standard as plate_format_ok
 
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("orig", "fixed", "adaptive")
@@ -63,13 +67,18 @@ def frame_key(name):
     return Path(str(name)).stem  # "x.png" and "x" are the same frame
 
 
-def is_standard(text):
+def is_standard(text, country="kr"):
     """True for a plate text the judge can call readable (see src.plate.judge).
 
-    Carmaker advertising plates (123케4567), military and diplomatic plates are real but
-    use other characters or formats, so a read of them can never be right.
+    Carmaker advertising plates (123케4567), military and diplomatic plates, and US vanity
+    plates are real but use other characters or formats, so a read of them can never be right.
     """
-    return bool(PLATE_RE.match(text))
+    return plate_format_ok(text, country)
+
+
+def countries_of(countries):
+    """Plate country file or {country: [patterns]} dict -> dict; None reads data/plate_countries.json."""
+    return countries if isinstance(countries, dict) else load_countries(countries)
 
 
 def load_labels(labels):
@@ -123,14 +132,15 @@ def match_frame(preds, labels):
     return matched
 
 
-def score(results, labels):
+def score(results, labels, countries=None):
     """Returns (summary dict, {frame: mean char accuracy of its readable labels, or None})."""
-    preds, gold = load_results(results), load_labels(labels)
+    preds, gold, countries = load_results(results), load_labels(labels), countries_of(countries)
     plates = detected = exact = unreadable = nonstandard = overconfident = readable_wrong = missing = 0
     accs, frames = [], {}
     for frame, labs in gold.items():
         missing += frame not in preds
         matched = match_frame(preds.get(frame, []), labs)
+        country = country_of(frame, countries)
         frame_accs = []
         for i, lab in enumerate(labs):
             p = matched.get(i)
@@ -138,7 +148,7 @@ def score(results, labels):
                 unreadable += 1
                 overconfident += p is not None and p["status"] == "readable"
                 continue
-            if not is_standard(lab["text"]):  # a readable answer here is always wrong
+            if not is_standard(lab["text"], country):  # a readable answer here is always wrong
                 nonstandard += 1
                 readable_wrong += p is not None and p["status"] == "readable"
                 continue
@@ -164,12 +174,14 @@ def score(results, labels):
     return summary, frames
 
 
-def eval_ocr(results, labels) -> dict:
+def eval_ocr(results, labels, countries=None) -> dict:
     """Score one condition's OCR results.
 
     Args:
         results: path to results/ocr/<cond>.csv, or its rows as dicts.
         labels: dict, JSON file or folder in the plate label format above.
+        countries: plate country file or {country: [patterns]} (see src.plate.country);
+            None reads data/plate_countries.json. A label is checked against its country's format.
 
     Returns:
         {"frames", "plates", "unreadable_labels", "nonstandard_labels", "detection_rate",
@@ -179,15 +191,15 @@ def eval_ocr(results, labels) -> dict:
         counts those that were read as readable. Labels that are not standard plates
         (is_standard) are left out too; a readable answer on one counts as readable_wrong.
     """
-    return score(results, labels)[0]
+    return score(results, labels, countries)[0]
 
 
-def frame_char_accuracy(results, labels) -> dict:
+def frame_char_accuracy(results, labels, countries=None) -> dict:
     """{frame: mean char accuracy of its readable standard labeled plates, or None if it has none}."""
-    return score(results, labels)[1]
+    return score(results, labels, countries)[1]
 
 
-def plate_details(results, labels) -> dict:
+def plate_details(results, labels, countries=None) -> dict:
     """{frame: [{"label", "label_bbox", "text", "status", "crop_path", "char_acc"}]}, one entry per readable
     standard labeled plate.
 
@@ -195,15 +207,16 @@ def plate_details(results, labels) -> dict:
     results are left out; frames without a readable labeled plate map to [].
     The mean char_acc of a frame equals frame_char_accuracy.
     """
-    preds, gold = load_results(results), load_labels(labels)
+    preds, gold, countries = load_results(results), load_labels(labels), countries_of(countries)
     out = {}
     for frame, labs in gold.items():
         if frame not in preds:
             continue
         matched = match_frame(preds[frame], labs)
+        country = country_of(frame, countries)
         plates = []
         for i, lab in enumerate(labs):
-            if lab["text"] is None or not is_standard(lab["text"]):
+            if lab["text"] is None or not is_standard(lab["text"], country):
                 continue
             p = matched.get(i) or {}
             plates.append({"label": lab["text"], "label_bbox": lab["bbox"], "text": p.get("text"),
@@ -228,12 +241,14 @@ def main():
     ap = argparse.ArgumentParser(description="Score results/ocr/<cond>.csv against plate labels.")
     ap.add_argument("--labels", type=Path, default=ROOT / "data" / "labels")
     ap.add_argument("--results", type=Path, default=ROOT / "results")
+    ap.add_argument("--countries", type=Path, help="plate country of each frame, default: data/plate_countries.json")
     args = ap.parse_args()
+    countries = load_countries(args.countries)
     rows = []
     for cond in CONDITIONS:
         path = args.results / "ocr" / f"{cond}.csv"
         if path.exists():
-            rows.append({"condition": cond, **eval_ocr(path, args.labels)})
+            rows.append({"condition": cond, **eval_ocr(path, args.labels, countries)})
     if not rows:
         raise SystemExit(f"no {args.results / 'ocr'}/<cond>.csv found")
     out = write_summary(rows, args.results / "ocr" / "ocr_summary.csv")
