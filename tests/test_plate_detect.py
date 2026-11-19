@@ -1,9 +1,11 @@
+from types import SimpleNamespace
+
 import cv2
 import numpy as np
 import pytest
 
 from src.plate.candidates import TOP_K, box_sums, detect_plate_candidates, grow_box, integral, iou
-from src.plate.detect import WEIGHTS, detect_vehicles
+from src.plate.detect import WEIGHTS, detect_vehicles, own_car
 from src.plate.imgutil import to_gray
 
 PLATE = (250, 330, 110, 24)  # (x, y, w, h), about 4.5:1 like a long one-line plate
@@ -94,3 +96,42 @@ def test_detect_vehicles_on_sample_image():
     assert areas == sorted(areas, reverse=True)
     with pytest.raises(ValueError):
         detect_vehicles(np.zeros((10, 10), np.uint8))
+
+
+class FakeYolo:
+    """Stands in for YOLO: predict returns the given xyxy boxes as cars, with optional masks."""
+
+    def __init__(self, boxes, masks=None):
+        self.boxes, self.masks = np.array(boxes, float), masks
+
+    def predict(self, img, **kwargs):
+        n = len(self.boxes)
+        boxes = SimpleNamespace(xyxy=self.boxes, cls=np.full(n, 2.0), conf=np.full(n, 0.5))
+        masks = None if self.masks is None else SimpleNamespace(
+            data=SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: self.masks)))
+        return [SimpleNamespace(boxes=boxes, masks=masks)]
+
+
+def test_own_car():
+    assert own_car((3, 681, 1735, 382), 1920, 1080)  # a dashboard box from an own clip
+    assert not own_car((500, 681, 900, 382), 1920, 1080)  # not wide enough
+    assert not own_car((3, 400, 1735, 400), 1920, 1080)  # wide, but ends above the bottom band
+
+
+def test_detect_vehicles_drops_the_camera_car(monkeypatch):
+    import src.plate.detect as detect
+
+    model = FakeYolo([[3, 681, 1738, 1063], [700, 500, 1000, 760]])  # dashboard, car ahead
+    monkeypatch.setattr(detect, "_vehicle_model", lambda: model)
+    assert [v["bbox"] for v in detect_vehicles(np.zeros((1080, 1920, 3), np.uint8))] == [(700, 500, 300, 260)]
+
+
+def test_fog_masks_drop_the_camera_car(monkeypatch):
+    import tools.synth_fog as synth_fog
+
+    masks = np.zeros((2, 108, 192), np.float32)
+    masks[0, 68:106, 0:174] = 1  # dashboard
+    masks[1, 50:76, 70:100] = 1  # car ahead
+    monkeypatch.setattr(synth_fog, "_seg_model", FakeYolo([[0, 68, 174, 106], [70, 50, 100, 76]], masks))
+    kept = synth_fog.vehicle_masks(np.zeros((108, 192, 3), np.uint8))
+    assert len(kept) == 1 and kept[0][60, 85] and not kept[0][90, 50]
