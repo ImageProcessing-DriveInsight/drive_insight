@@ -12,6 +12,10 @@ Frame images, frames/<frame>.png: the whole frame in each condition side by side
 labeled plate boxes in the same colors. Made for the frames in the lists, or for --frames
 (a frame without a readable labeled plate is drawn without boxes).
 
+When results/ocr/clear.csv exists (OCR on the clear frames of the synthetic fog clips, #79), a
+clear column comes first, as a reference: what the plate looked like and read without fog. Frames
+without a clear frame leave that column empty. The lists still compare only orig, fixed and adaptive.
+
 The plate area is cut from each condition's frame at the label box, so every column shows the
 same place, also where OCR missed the plate. Small plates are enlarged without smoothing, so the
 real resolution shows.
@@ -39,6 +43,7 @@ from src.plate.imgutil import load_png  # noqa: E402
 from tools.label_draft import font  # noqa: E402
 
 CONDS = ("orig", "fixed", "adaptive")
+REFERENCE = "clear"  # clear frames of the synthetic fog clips, shown first when read
 RESULTS = ROOT / "results"
 LABELS = ROOT / "data" / "labels"
 FRAMES = ROOT / "data" / "frames"
@@ -67,6 +72,8 @@ def wrong_readable(plate):
 
 
 def color(plate):
+    if plate is None:
+        return FAINT
     acc = plate["char_acc"]
     if wrong_readable(plate):
         return BAD
@@ -75,6 +82,8 @@ def color(plate):
 
 def read_of(plate, hide=0):
     """What OCR gave for a labeled plate: text, char accuracy and status."""
+    if plate is None:
+        return "no clear frame"
     acc = f"{plate['char_acc']:.2f}"
     if plate["status"] is None:
         return f"missed  {acc}"
@@ -88,7 +97,8 @@ def collect(results=RESULTS, labels=LABELS, conds=CONDS):
     """(conditions found, rows): one row per readable labeled plate read in every found condition.
 
     Row: {"frame", "label", "bbox", "reads": {condition: plate_details entry}}. orig and at least
-    one other condition must have results/ocr/<cond>.csv.
+    one other condition must have results/ocr/<cond>.csv. With ocr/clear.csv, the conditions start
+    with clear and reads["clear"] is None for a frame without a clear frame.
     """
     gold = load_labels(labels)
     details = {}
@@ -98,17 +108,22 @@ def collect(results=RESULTS, labels=LABELS, conds=CONDS):
             details[cond] = plate_details(path, gold)
     if "orig" not in details or len(details) < 2:
         raise FileNotFoundError(f"need ocr/orig.csv and another condition in {results}")
+    clear_path = Path(results) / "ocr" / f"{REFERENCE}.csv"
+    clear = plate_details(clear_path, gold) if clear_path.exists() else None
     rows = []
     for frame, plates in details["orig"].items():
         if all(frame in d for d in details.values()):
-            rows += [{"frame": frame, "label": p["label"], "bbox": p["label_bbox"],
-                      "reads": {c: d[frame][i] for c, d in details.items()}} for i, p in enumerate(plates)]
-    return list(details), rows
+            for i, p in enumerate(plates):
+                reads = {c: d[frame][i] for c, d in details.items()}
+                if clear is not None:
+                    reads = {REFERENCE: clear[frame][i] if frame in clear else None, **reads}
+                rows.append({"frame": frame, "label": p["label"], "bbox": p["label_bbox"], "reads": reads})
+    return ([REFERENCE] if clear is not None else []) + list(details), rows
 
 
 def later(conds, base):
-    """The conditions after base in CONDS order, among conds."""
-    return [c for c in conds if CONDS.index(c) > CONDS.index(base)]
+    """The conditions after base in CONDS order, among conds (never the clear reference)."""
+    return [c for c in conds if c in CONDS and CONDS.index(c) > CONDS.index(base)]
 
 
 def change(row, base="orig"):
@@ -209,6 +224,8 @@ def frame_image(frame, rows, conds, frames_dir=FRAMES, hide=0):
         for row in rows:
             x, y, w, h = (round(v * scale) for v in row["bbox"])
             plate = row["reads"][cond]
+            if plate is None:
+                continue
             box = [left + x, 36 + y, left + x + max(w, 2), 36 + y + max(h, 2)]
             d.rectangle(box, outline=color(plate), width=2)
             text, at = read_of(plate, hide), (box[0], box[3] + 3)
