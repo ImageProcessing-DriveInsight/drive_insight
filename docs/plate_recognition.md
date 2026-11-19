@@ -16,7 +16,10 @@ Crop → `preprocess_plate` (own) → `recognize` (PaddleOCR) → `judge` (own r
 `cond` and `frame_id` are optional so `detect_plates(frame)` still works (crops then go to `crops/misc/` under a hash of the frame).
 Plate crops show real plates and are ignored by git.
 
-`python -m src.plate.run <cond>` reads `data/frames/<cond>/*.png` and writes `results/ocr/<cond>.csv`:
+`python -m src.plate.run <cond>` reads `data/frames/<cond>/*.png` and writes `results/ocr/<cond>.csv`.
+`clear` reads the clear frames the synthetic fog clips were made from (`data/frames/clear/`), a reference
+for how the plates read without fog, not an enhancement condition (#79).
+
 
 | Column | Meaning |
 | --- | --- |

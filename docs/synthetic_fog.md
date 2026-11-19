@@ -61,6 +61,8 @@ python tools/synth_fog.py make data/clear/day_01.mp4 data/clips/fog_01.mp4 --hor
 python tools/synth_fog.py reference data/clips/fog_01.mp4
 # 5. label drafts from the clear frames (same boxes, better detection)
 python tools/label_draft.py draft --frames data/frames/clear --only "fog_*"
+# 6. after OCR on orig, fixed and adaptive: the clear frames as a reference (results/ocr/clear.csv, #79)
+python -m src.plate.run clear
 ```
 
 - Put the horizon row where the road meets the sky or vanishes. Too low makes the near road foggy;

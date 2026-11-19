@@ -17,6 +17,8 @@
 번호판 크롭에는 실제 번호판이 보이므로 git에서 제외합니다.
 
 `python -m src.plate.run <cond>`는 `data/frames/<cond>/*.png`를 읽어 `results/ocr/<cond>.csv`를 씁니다.
+`clear`는 합성 안개 클립을 만든 맑은 프레임(`data/frames/clear/`)을 읽습니다. 안개가 없을 때 번호판이 얼마나
+읽히는지 보는 기준이고, 보정 조건이 아닙니다(#79).
 
 | 열 | 의미 |
 | --- | --- |

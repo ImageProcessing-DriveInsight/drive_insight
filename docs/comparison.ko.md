@@ -71,6 +71,10 @@ python tools/compare_images.py --frames fog_01_3500 # 고른 프레임의 프레
 | `worse_vs_fixed.png` | `adaptive`에서 `fixed`보다 못 읽힌 라벨 번호판 |
 | `frames/<frame>.png` | 목록에 나온 프레임(또는 `--frames`)을 조건별로 나란히, 라벨 번호판 박스와 함께 |
 
+`results/ocr/clear.csv`가 있으면(#79) 모든 이미지 맨 앞에 `clear` 열이 붙습니다. 안개를 입히기 전 맑은 프레임과
+거기서 OCR이 읽은 결과입니다. 맑은 프레임이 없는 프레임에는 `no clear frame`이라고 나옵니다. 목록은 여전히
+`orig`, `fixed`, `adaptive`만 비교합니다.
+
 - 번호판 한 줄에는 라벨, 그리고 조건마다 번호판 영역과 OCR이 읽은 글자, 문자 정확도, 판정 상태가 나옵니다.
   초록은 완전일치, 주황은 일부 맞음, 빨강은 틀림이나 놓침입니다(`missed`는 짝지어진 박스가 없음).
 - `readable`로 판정됐는데 글자가 틀린 결과는 문자 정확도와 상관없이 `readable, wrong`으로 빨갛게 표시합니다.

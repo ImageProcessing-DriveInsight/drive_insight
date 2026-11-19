@@ -71,6 +71,10 @@ python tools/compare_images.py --frames fog_01_3500 # frame images for chosen fr
 | `worse_vs_fixed.png` | labeled plates read worse in `adaptive` than in `fixed` |
 | `frames/<frame>.png` | the whole frame in each condition side by side with its labeled plate boxes, for the frames in the lists or `--frames` |
 
+With `results/ocr/clear.csv` (#79) every image starts with a `clear` column: the clear frame the
+fog was made from and what OCR read there. A frame without a clear frame says `no clear frame`.
+The lists still compare only `orig`, `fixed` and `adaptive`.
+
 - Each plate row has the label, then the plate area in every condition with what OCR read, the
   char accuracy and the status: green exact, orange partly right, red wrong or missed (`missed` =
   no box matched).
