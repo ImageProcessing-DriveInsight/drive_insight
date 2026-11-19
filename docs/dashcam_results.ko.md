@@ -19,9 +19,7 @@ C 파트의 첫 실제 수치입니다. 직접 찍은 맑은 날 블랙박스 �
 | 라벨 | C가 확대한 크롭을 보고 작성. 글자는 맑은 프레임에서, 상태는 안개 프레임에서 정함(모든 글자를 안개 프레임에서 읽을 수 있을 때만 `readable`). 번호판 66개: readable 13개(서로 다른 번호판 10개, 한 차가 3프레임에 나옴), unreadable 53개. 폭이 약 40 px보다 좁은 번호판과 다른 차에 가린 번호판은 라벨하지 않음. 가장 가까운 맑은 프레임에서도 한글을 확정하지 못한 번호판 1개는 unreadable로 둠. D의 검수(ALL-03) 전 |
 
 ```bash
-python -m src.plate.run orig && python -m src.plate.run fixed && python -m src.plate.run adaptive && python -m src.plate.run clear
-python -m src.eval.ocr --labels data/labels && python -m src.eval.aggregate && python -m src.eval.compare
-python tools/compare_images.py
+python tools/plate_report.py    # 모든 조건 OCR, 평가, 집계, 비교, 발표용 이미지 (#81)
 ```
 
 ## 결과

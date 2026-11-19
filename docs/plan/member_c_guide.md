@@ -88,6 +88,7 @@ python tools/label_draft.py draft              # ALL-02: box drafts in scenes.js
 python tools/pick_frames.py scan <clear>       # ALL-01: vehicle boxes, then `pick` for the window and timestamps (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
 python tools/compare_images.py                 # C-11: plate and frame images for slides (--hide 2)
+python tools/plate_report.py                   # C-08 to C-11 in one run: OCR on every condition, then evaluation to images (#81)
 ```
 
 US plates: list their frames in `data/plate_countries.json`, e.g. `{"us": ["bdd_*"]}` ([plate_recognition.md](../plate_recognition.md#us-plates)).

@@ -88,6 +88,7 @@ python tools/label_draft.py draft              # ALL-02: scenes.json에 박스 �
 python tools/pick_frames.py scan <clear>       # ALL-01: 차량 박스, 이어서 `pick`으로 구간과 타임스탬프 (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: 맑은 날 영상으로 안개 클립 생성
 python tools/compare_images.py                 # C-11: 발표용 번호판·프레임 이미지 (--hide 2)
+python tools/plate_report.py                   # C-08~C-11 한 번에: 모든 조건 OCR, 이어서 평가부터 이미지까지 (#81)
 ```
 
 미국 번호판: 해당 프레임을 `data/plate_countries.json`에 적습니다. 예: `{"us": ["bdd_*"]}` ([plate_recognition.ko.md](../plate_recognition.ko.md#미국-번호판)).
