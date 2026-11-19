@@ -2,7 +2,7 @@
 
 DriveInsight · Team 16 Black Box · first version Nov 8, 2026 · **updated Nov 19, 2026**
 
-[한국어](member_c_guide.ko.md) · [Team plan](team_plan.md) · [Feature spec](feature_spec.md)
+[한국어](member_c_guide.ko.md) · [Team plan](team_plan.md) · [Feature spec](feature_spec.md) · [Talk script (KO)](member_c_talk.ko.md)
 
 C finds and reads vehicles and plates (`src/plate/`) and combines the three conditions' results into a comparison (`src/eval/`).
 
@@ -13,7 +13,7 @@ C finds and reads vehicles and plates (`src/plate/`) and combines the three cond
 | **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72 |
 | **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.5–1.8 s per 1080p frame |
 | **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19) |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
 | **Waiting for** | D's review of C's labels (ALL-03), D's runner (#38) and `timing.csv`, VLM scores (D), other members' clips and labels |
 | **Next** | Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist; final aggregation after the VLM scores |
 
