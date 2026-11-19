@@ -5,6 +5,9 @@ Reads, under results_dir:
                           or ocr/<cond>.csv scored against labels when labels are given
     vlm/score.csv         VLM scores (D-08), one row per condition or per condition and clip
     timing.csv            step times per frame (D-04), and/or <cond>/timing.csv per condition
+    ocr/<cond>.csv, params/<cond>.json
+                          step times of a condition without a timing file: ocr_ms of the OCR run
+                          (C-08) and enhance_ms of the fixed (A) or adaptive (B) batch
 and writes summary.csv with one row per condition. A missing source leaves its columns empty.
 
 Usage:
@@ -13,6 +16,7 @@ Usage:
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 from .ocr import CONDITIONS, eval_ocr
@@ -119,6 +123,29 @@ def timing_rows(results_dir):
     return rows
 
 
+def log_rows(results_dir, conds):
+    """Step times from the stage logs, for conditions without a timing file.
+
+    ocr_ms comes from ocr/<cond>.csv (once per frame; every plate row of a frame has the same
+    value) and enhance_ms from params/<cond>.json, the per-frame log of A's fixed batch and B's
+    adaptive batch. orig has no enhancement step. total_ms stays empty: the VLM step is not in
+    these logs, and D's runner (D-04) measures the whole frame.
+    """
+    results_dir, rows = Path(results_dir), []
+    for cond in conds:
+        path = results_dir / "ocr" / f"{cond}.csv"
+        if not path.exists():
+            continue
+        params = results_dir / "params" / f"{cond}.json"
+        enhance = json.loads(params.read_text(encoding="utf-8")) if params.exists() else {}
+        frames = {}
+        for r in read_rows(path, condition=cond):
+            frames.setdefault(r["frame"], r.get("ocr_ms"))
+        rows += [{"condition": cond, "frame": frame, "ocr_ms": ms, "enhance_ms": (enhance.get(frame) or {}).get("enhance_ms")}
+                 for frame, ms in frames.items()]
+    return rows
+
+
 def time_metrics(rows):
     """{cond: mean ms per frame for each step}. Empty cells are skipped, e.g. vlm_ms on frames without a VLM call."""
     return {cond: {k: mean(num(r.get(k)) for r in rs) for k in TIME_COLUMNS}
@@ -128,9 +155,12 @@ def time_metrics(rows):
 def summarize(results_dir, labels=None):
     """Rows of summary.csv as dicts: orig, fixed, adaptive first, then any other condition found."""
     results_dir = Path(results_dir)
+    timing = timing_rows(results_dir)
+    timed = {r["condition"].strip() for r in timing}
+    timing += log_rows(results_dir, [c for c in CONDITIONS if c not in timed])
     sources = [ocr_metrics(results_dir, labels),
                vlm_metrics(results_dir / "vlm" / "score.csv"),
-               time_metrics(timing_rows(results_dir))]
+               time_metrics(timing)]
     found = {cond for s in sources for cond in s}
     order = [c for c in CONDITIONS if c in found] + sorted(found - set(CONDITIONS))
     rows = []
