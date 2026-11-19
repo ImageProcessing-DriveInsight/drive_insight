@@ -239,3 +239,12 @@ data/clear/
 
 # Local DIP development notes
 /docs/dip.md
+
+# Real clips, frames, labels and plate results show or spell real plates (#78)
+/data/clips/
+/data/frames/
+/data/labels/
+/data/annotations/
+/results/ocr/
+/results/worse_cases.csv
+/results/videos/
