@@ -94,3 +94,28 @@ def test_run_ocr_rejects_bad_input(tmp_path):
         run.run_ocr("night", frames_dir=tmp_path)
     with pytest.raises(FileNotFoundError):
         run.run_ocr("orig", frames_dir=tmp_path)
+
+
+def test_detect_plates_passes_the_country(tmp_path, fake_models):
+    fake_models["reads"] = [("7ABC123", 0.95)]
+    p = detect.detect_plates(car_frame(), results_dir=tmp_path, country="us")[0]
+    assert fake_models["country"] == "us"
+    assert (p["status"], p["text"]) == ("readable", "7ABC123")
+    assert detect.detect_plates(car_frame(), results_dir=tmp_path)[0]["status"] == "unreadable"  # Korean rules
+    with pytest.raises(ValueError):
+        detect.detect_plates(car_frame(), results_dir=tmp_path, country="jp")
+
+
+def test_run_ocr_uses_the_country_of_each_frame(tmp_path, monkeypatch):
+    frames = tmp_path / "frames"
+    for name in ("bdd_01_100", "fog_01_100"):
+        save_png(frames / f"{name}.png", car_frame())
+    seen = {}
+
+    def fake_detect(frame, cond, frame_id, results_dir, **kw):
+        seen[frame_id] = kw
+        return []
+
+    monkeypatch.setattr(run, "detect_plates", fake_detect)
+    run.run_ocr("orig", frames_dir=frames, results_dir=tmp_path / "results", countries={"us": ["bdd_*"]})
+    assert seen == {"bdd_01_100": {"country": "us"}, "fog_01_100": {}}  # Korean frames: same call as before

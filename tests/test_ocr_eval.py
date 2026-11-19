@@ -150,3 +150,29 @@ def test_cli_writes_summary(tmp_path, monkeypatch):
     rows = list(csv.DictReader(open(ocr_dir / "ocr_summary.csv", encoding="utf-8")))
     assert [r["condition"] for r in rows] == ["orig"]
     assert (rows[0]["frames"], rows[0]["exact_match"], rows[0]["missing_frames"]) == ("2", "1.0", "0")
+
+
+def test_us_labels_use_the_us_format(tmp_path):
+    """bdd_* frames are US: 7ABC123 is a standard plate there, a letters-only vanity plate is not.
+    The same 7ABC123 label on a Korean frame is nonstandard, so it never enters the rates.
+
+    us frame: plates 1 (7ABC123, read 7ABC128 -> 1 - 1/7), nonstandard 1 (vanity, read as readable -> wrong)
+    """
+    countries = {"us": ["bdd_*"]}
+    labels = {"bdd_01_100.png": [{"bbox": [0, 0, 60, 30], "text": "7ABC123"},
+                                 {"bbox": [200, 0, 60, 30], "text": "GOBEARS"}],
+              "fog_01_100.png": [{"bbox": [0, 0, 60, 30], "text": "7ABC123"}]}
+    results = [row("bdd_01_100.png", 0, 0, 60, 30, "7ABC128", "uncertain"),
+               row("bdd_01_100.png", 200, 0, 60, 30, "GOBEARS", "readable"),
+               row("fog_01_100.png", 0, 0, 60, 30, "7ABC123", "readable")]
+    s = ev.eval_ocr(results, labels, countries)
+    assert (s["plates"], s["nonstandard_labels"]) == (1, 2)
+    assert s["char_accuracy"] == pytest.approx(6 / 7) and s["exact_match"] == 0.0
+    assert s["readable_wrong"] == 2
+    assert [p["label"] for p in ev.plate_details(results, labels, countries)["bdd_01_100"]] == ["7ABC123"]
+    assert ev.frame_char_accuracy(results, labels, countries)["fog_01_100"] is None
+
+    path = tmp_path / "countries.json"
+    path.write_text(json.dumps(countries), encoding="utf-8")
+    assert ev.eval_ocr(results, labels, path) == s  # a country file works the same
+    assert ev.is_standard("7ABC123", "us") and not ev.is_standard("7ABC123")
