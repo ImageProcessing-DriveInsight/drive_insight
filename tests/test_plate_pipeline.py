@@ -29,8 +29,9 @@ def fake_models(monkeypatch):
     state = {"reads": [("12가3456", 0.95)], "calls": 0}
     monkeypatch.setattr(detect, "detect_vehicles", lambda frame: [VEHICLE])
 
-    def fake_recognize(crop):
+    def fake_recognize(crop, country="kr"):
         state["calls"] += 1
+        state["country"] = country
         return state["reads"][min(state["calls"], len(state["reads"])) - 1]
 
     monkeypatch.setattr(detect, "recognize", fake_recognize)
