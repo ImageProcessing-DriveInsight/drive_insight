@@ -18,7 +18,7 @@ ASPECTS = (2.0, 3.0, 4.5)  # plate width / height: two-line to long one-line pla
 MIN_W, MIN_H = 24, 8
 BRIGHT_W = 1.0  # weight of the brightness term against the edge term
 GROW_FRAC = 0.35  # grow while the edge profile stays above this share of the box mean
-TOP_K = 3  # candidates kept per vehicle
+TOP_K = 4  # candidates kept per vehicle; in fog a headlight and grille can outscore the plate (#71)
 NMS_IOU = 0.3
 
 
