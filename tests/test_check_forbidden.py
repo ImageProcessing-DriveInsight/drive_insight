@@ -1,5 +1,10 @@
 """Checker fixtures are source strings and never executed or imported."""
 
+import json
+from pathlib import Path
+import subprocess
+import sys
+
 import pytest
 
 from tools.check_forbidden import ALLOWED_CV2_IO, check_source, scan_paths
@@ -98,3 +103,49 @@ def test_current_submission_source_has_no_findings():
     result = scan_paths()
     assert result.files
     assert result.findings == []
+
+
+@pytest.mark.parametrize("module", [False, True])
+def test_cli_default_source_and_json(module, tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    command = [sys.executable, "-m", "tools.check_forbidden"] if module else [
+        sys.executable, str(root / "tools/check_forbidden.py")]
+    result = subprocess.run(command + ["--json"], cwd=root if module else tmp_path,
+                            capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode == 0 and result.stderr == ""
+    report = json.loads(result.stdout)
+    assert report["exit_code"] == 0 and report["findings"] == []
+    assert report["files_scanned"] == len(report["files"]) > 0
+    assert all(p.startswith("src/") for p in report["files"])
+
+
+@pytest.mark.parametrize("source,exit_code,code", [
+    ("raise RuntimeError('must never execute')", 0, None),
+    ("import cv2\ncv2.resize(img,(2,2))", 1, "CV2_FORBIDDEN"),
+    ("def enhance_stub(x): return x", 1, "STUB_IDENTIFIER"),
+    ("def broken(", 2, "PARSE_ERROR"),
+])
+def test_cli_exit_codes_and_diagnostics(tmp_path, source, exit_code, code):
+    root = Path(__file__).resolve().parents[1]
+    file = tmp_path / "fixture.py"
+    file.write_text(source, encoding="utf-8")
+    command = [sys.executable, str(root / "tools/check_forbidden.py"), str(file)]
+    plain = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
+    report = subprocess.run(command + ["--json"], capture_output=True, text=True, encoding="utf-8")
+    assert plain.returncode == report.returncode == exit_code
+    assert plain.stderr == report.stderr == ""
+    parsed = json.loads(report.stdout)
+    assert parsed["exit_code"] == exit_code and parsed["files_scanned"] == 1
+    if code:
+        assert code in plain.stdout and f"{file}:" in plain.stdout
+        assert any(f["code"] == code for f in parsed["findings"])
+    else:
+        assert parsed["findings"] == []
+
+
+def test_read_error_takes_precedence_over_violations(tmp_path):
+    (tmp_path / "bad.py").write_bytes(b"\xff")
+    (tmp_path / "forbidden.py").write_text("x_stub = None", encoding="utf-8")
+    result = scan_paths([tmp_path])
+    assert result.exit_code == 2
+    assert {f.code for f in result.findings} == {"READ_ERROR", "STUB_IDENTIFIER"}
