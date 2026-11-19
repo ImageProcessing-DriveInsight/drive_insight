@@ -19,7 +19,7 @@
 | A-10: 반복 벤치마크, 성능 개선, 메모리·병렬화 결정 | — | [dip_performance.ko.md](dip_performance.ko.md) |
 | A-12: 금지 OpenCV·stub 검사, 허용 목록, 종료 코드와 정적 분석 한계 | — | [forbidden_check.ko.md](forbidden_check.ko.md) |
 | C-01: 검출기·OCR 비교, 버전, 라이선스 | [model_selection.md](model_selection.md) | [model_selection.ko.md](model_selection.ko.md) |
-| C-04\~C-08: 전처리 비교, 판정 규칙, 파이프라인, CSV 형식 | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
+| C-04\~C-08: 전처리 비교, 판정 규칙, 파이프라인, CSV 형식, 미국 번호판 | [plate_recognition.md](plate_recognition.md) | [plate_recognition.ko.md](plate_recognition.ko.md) |
 | C-09: 평가 지표, 번호판 매칭, 라벨 형식 | [ocr_evaluation.md](ocr_evaluation.md) | [ocr_evaluation.ko.md](ocr_evaluation.ko.md) |
 | C-10: 조건별 `summary.csv`, `score.csv` 형식 제안 | [aggregation.md](aggregation.md) | [aggregation.ko.md](aggregation.ko.md) |
 | C-11: 조건 간 개선·악화 프레임, 악화 사례 목록, 발표용 이미지 | [comparison.md](comparison.md) | [comparison.ko.md](comparison.ko.md) |
