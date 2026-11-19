@@ -58,7 +58,7 @@ Like `results/ocr/<cond>.csv`, this file contains plate text.
 `tools/compare_images.py` draws the plates and frames behind these numbers.
 
 ```bash
-python tools/compare_images.py                      # results/figures/: better.png, worse.png, frames/
+python tools/compare_images.py                      # results/figures/: better.png, worse.png, *_vs_fixed.png, frames/
 python tools/compare_images.py --hide 2             # last 2 characters of every labeled plate covered
 python tools/compare_images.py --frames fog_01_3500 # frame images for chosen frames
 ```
@@ -67,10 +67,17 @@ python tools/compare_images.py --frames fog_01_3500 # frame images for chosen fr
 | --- | --- |
 | `better.png` | labeled plates read better in `fixed` or `adaptive` than in `orig`, largest gain first (`--top`, default 6) |
 | `worse.png` | labeled plates read worse in `fixed` or `adaptive` than in `orig`, largest loss first |
-| `frames/<frame>.png` | the whole frame in each condition side by side with its labeled plate boxes, for the frames in the two lists or `--frames` |
+| `better_vs_fixed.png` | labeled plates read better in `adaptive` than in `fixed`, like the `fixed → adaptive` row of `compare.csv` (when both exist) |
+| `worse_vs_fixed.png` | labeled plates read worse in `adaptive` than in `fixed` |
+| `frames/<frame>.png` | the whole frame in each condition side by side with its labeled plate boxes, for the frames in the lists or `--frames` |
 
-- Each plate row has the label, then the plate area in every condition with what OCR read and the
-  char accuracy: green exact, orange partly right, red wrong or missed (`missed` = no box matched).
+- Each plate row has the label, then the plate area in every condition with what OCR read, the
+  char accuracy and the status: green exact, orange partly right, red wrong or missed (`missed` =
+  no box matched).
+- A read judged `readable` with the wrong text says `readable, wrong` and is red, whatever its char
+  accuracy: it is a confident wrong answer (`readable_wrong` in the metrics). The lists are ordered
+  by char accuracy, so such a read can still be in a better list, e.g. `24어8197` (0.86) against an
+  uncertain `240?1974` (0.57).
 - The plate area is cut at the label box plus 10 % on each side from each condition's frame, so all
   columns show the same place, also where OCR missed the plate. Small plates are enlarged without
   smoothing, so their real resolution shows.
