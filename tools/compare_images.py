@@ -1,10 +1,13 @@
 """Comparison images for slides (C-11): the same plates and frames in orig, fixed and adaptive.
 
 Plate lists, one row per labeled plate: its label, then the plate area in each condition with
-what OCR read there and the char accuracy, colored green (exact), orange (partly right) or red
-(wrong or missed).
-    better.png  plates read better in fixed or adaptive than in orig, largest gain first
-    worse.png   plates read worse in fixed or adaptive than in orig, largest loss first
+what OCR read there, the char accuracy and the status, colored green (exact), orange (partly
+right) or red (wrong or missed). A read judged readable but not the labeled text says
+"readable, wrong" and is red, since it is the worst case: a confident wrong answer.
+    better.png          plates read better in fixed or adaptive than in orig, largest gain first
+    worse.png           plates read worse in fixed or adaptive than in orig, largest loss first
+    better_vs_fixed.png plates read better in adaptive than in fixed (when both exist)
+    worse_vs_fixed.png  plates read worse in adaptive than in fixed
 Frame images, frames/<frame>.png: the whole frame in each condition side by side, with the
 labeled plate boxes in the same colors. Made for the frames in the lists, or for --frames
 (a frame without a readable labeled plate is drawn without boxes).
@@ -58,17 +61,27 @@ def hide_text(text, n):
     return text[:max(0, len(text) - n)] + "*" * min(n, len(text))
 
 
-def color(acc):
+def wrong_readable(plate):
+    """True for a confident wrong read: judged readable, but not the labeled text."""
+    return plate["status"] == "readable" and plate["char_acc"] < 1 - EPS
+
+
+def color(plate):
+    acc = plate["char_acc"]
+    if wrong_readable(plate):
+        return BAD
     return GOOD if acc >= 1 - EPS else PART if acc > EPS else BAD
 
 
 def read_of(plate, hide=0):
-    """What OCR gave for a labeled plate, with its char accuracy."""
+    """What OCR gave for a labeled plate: text, char accuracy and status."""
+    acc = f"{plate['char_acc']:.2f}"
     if plate["status"] is None:
-        read = "missed"
-    else:
-        read = hide_text(plate["text"], hide) or plate["status"]
-    return f"{read}  {plate['char_acc']:.2f}"
+        return f"missed  {acc}"
+    text = hide_text(plate["text"], hide)
+    if not text:
+        return f"{plate['status']}  {acc}"
+    return f"{text}  {acc}  {'readable, wrong' if wrong_readable(plate) else plate['status']}"
 
 
 def collect(results=RESULTS, labels=LABELS, conds=CONDS):
@@ -93,17 +106,22 @@ def collect(results=RESULTS, labels=LABELS, conds=CONDS):
     return list(details), rows
 
 
-def change(row):
-    """(best, worst) char accuracy change of the enhanced conditions against orig."""
-    base = row["reads"]["orig"]["char_acc"]
-    others = [p["char_acc"] - base for c, p in row["reads"].items() if c != "orig"]
+def later(conds, base):
+    """The conditions after base in CONDS order, among conds."""
+    return [c for c in conds if CONDS.index(c) > CONDS.index(base)]
+
+
+def change(row, base="orig"):
+    """(best, worst) char accuracy change of the conditions after base against base."""
+    ref = row["reads"][base]["char_acc"]
+    others = [row["reads"][c]["char_acc"] - ref for c in later(row["reads"], base)]
     return max(others), min(others)
 
 
-def pick(rows, top):
-    """(better, worse): at most top rows each, largest change first."""
-    better = sorted((r for r in rows if change(r)[0] > EPS), key=lambda r: (-change(r)[0], r["frame"]))
-    worse = sorted((r for r in rows if change(r)[1] < -EPS), key=lambda r: (change(r)[1], r["frame"]))
+def pick(rows, top, base="orig"):
+    """(better, worse) against base: at most top rows each, largest change first."""
+    better = sorted((r for r in rows if change(r, base)[0] > EPS), key=lambda r: (-change(r, base)[0], r["frame"]))
+    worse = sorted((r for r in rows if change(r, base)[1] < -EPS), key=lambda r: (change(r, base)[1], r["frame"]))
     return better[:top], worse[:top]
 
 
@@ -160,7 +178,7 @@ def plate_list(rows, conds, frames_dir=FRAMES, hide=0):
             else:
                 sheet.paste(fit(plate_area(cover(image, row["bbox"], row["label"], hide), row["bbox"])),
                             (left, top + PAD))
-            d.text((left, top + PAD + PLATE_H + 4), read_of(plate, hide), fill=color(plate["char_acc"]), font=small)
+            d.text((left, top + PAD + PLATE_H + 4), read_of(plate, hide), fill=color(plate), font=small)
     return sheet
 
 
@@ -192,25 +210,29 @@ def frame_image(frame, rows, conds, frames_dir=FRAMES, hide=0):
             x, y, w, h = (round(v * scale) for v in row["bbox"])
             plate = row["reads"][cond]
             box = [left + x, 36 + y, left + x + max(w, 2), 36 + y + max(h, 2)]
-            d.rectangle(box, outline=color(plate["char_acc"]), width=2)
+            d.rectangle(box, outline=color(plate), width=2)
             text, at = read_of(plate, hide), (box[0], box[3] + 3)
             d.rectangle(d.textbbox(at, text, font=small), fill=WHITE)  # readable over the photo
-            d.text(at, text, fill=color(plate["char_acc"]), font=small)
+            d.text(at, text, fill=color(plate), font=small)
     return sheet
 
 
 def write_images(results=RESULTS, labels=LABELS, frames_dir=FRAMES, out=None, top=6, hide=0, frames=None):
-    """Write better.png, worse.png and frames/<frame>.png. Returns the written paths."""
+    """Write the plate lists (better.png, worse.png, and better_vs_fixed.png, worse_vs_fixed.png
+    when fixed and adaptive exist) and frames/<frame>.png. Returns the written paths."""
     out = Path(out) if out else Path(results) / "figures"
     conds, rows = collect(results, labels)
-    better, worse = pick(rows, top)
-    paths = []
+    paths, listed = [], []
     out.mkdir(parents=True, exist_ok=True)
-    for name, chosen in (("better", better), ("worse", worse)):
-        if chosen:
-            paths.append(out / f"{name}.png")
-            plate_list(chosen, conds, frames_dir, hide).save(paths[-1])
-    names = [frame_key(f) for f in frames] if frames else list(dict.fromkeys(r["frame"] for r in better + worse))
+    for base, suffix in (("orig", ""), ("fixed", "_vs_fixed")):
+        if base not in conds or not later(conds, base):
+            continue
+        for name, chosen in zip(("better", "worse"), pick(rows, top, base)):
+            listed += chosen
+            if chosen:
+                paths.append(out / f"{name}{suffix}.png")
+                plate_list(chosen, conds, frames_dir, hide).save(paths[-1])
+    names = [frame_key(f) for f in frames] if frames else list(dict.fromkeys(r["frame"] for r in listed))
     for frame in names:
         if not any((Path(frames_dir) / c / f"{frame}.png").exists() for c in conds):
             raise ValueError(f"{frame}.png is in none of {', '.join(conds)} under {frames_dir}")
