@@ -6,7 +6,7 @@ DriveInsight · Team 16 Black Box · **최신화 2026-11-16**
 
 팀원 A\~D가 구현할 기능을 ID, 입력→출력, 요구사항, 검증 방법으로 정리했습니다. 프레임은 모두 `uint8` BGR `(H, W, 3)`, 실험 조건은 `orig`·`fixed`·`adaptive`입니다. 수치 기준(속도, 임계값)은 출발점이고, 통합 점검 1(11/10)에서 조정합니다.
 
-상태 열은 11/16 기준 저장소 내용만 반영합니다. **—** 는 저장소에 아직 없다는 뜻입니다(저장소 밖에서 진행 중일 수 있음).
+상태 열은 11/16 기준 저장소 내용만 반영합니다(C의 행은 11/19). **—** 는 저장소에 아직 없다는 뜻입니다(저장소 밖에서 진행 중일 수 있음).
 
 ## 팀원 A · 영상처리 연산
 
@@ -50,16 +50,16 @@ DriveInsight · Team 16 Black Box · **최신화 2026-11-16**
 | ID | 기능 | 입력 → 출력 | 요구사항 | 검증 방법 | 상태 |
 | --- | --- | --- | --- | --- | --- |
 | C-01 | 모델 선정 | → 선정 메모 | 차량 검출기, 번호판 검출기, 한국어 OCR 후보를 한국 번호판 샘플 10장으로 비교. 모델명·버전·가중치 출처 기록 | 10장 중 읽힌 수 기록 | 완료(#4, #8): YOLOv8n 차량 10/10, PaddleOCR 7/10, EasyOCR 3/10. [메모](../model_selection.ko.md) |
-| C-02 | 차량 검출 | `detect_vehicles(img) -> [{bbox, cls, conf}]` | car, truck, bus, motorcycle. `conf` ≥ 0.4. bbox는 `(x, y, w, h)`, 큰 박스부터 | 라벨 차량과 IoU ≥ 0.5 비율 | 완료(#10) |
+| C-02 | 차량 검출 | `detect_vehicles(img) -> [{bbox, cls, conf}]` | car, truck, bus, motorcycle. `conf` ≥ 0.4. bbox는 `(x, y, w, h)`, 큰 박스부터 | 라벨 차량과 IoU ≥ 0.5 비율 | 완료(#10). #78: 촬영 차량의 대시보드와 거기 비친 차는 뺌(`own_car`) |
 | C-03 | 번호판 후보 검출 | `detect_plate_candidates(img, vehicles) -> [bbox]` | 직접 구현: 차량 박스 아래쪽 탐색. 수직 에지 밀도와 밝기를 주변 띠와 비교해 점수 계산(적분 영상), 최고 창을 판 전체로 확장, 차량당 상위 4개, 차량이 없으면 프레임 전체 | 라벨 번호판 검출률 | 완료(#10): 실제 사진 10/10장에서 상위 3개 안, 8/10장에서 1위. #71: 안개에서 번호판이 4위라 4개로 늘림 |
 | C-04 | 크롭 전처리 | `preprocess_plate(crop, binarize=False, deskew=True) -> 그레이 크롭` | 직접 구현: 그레이 변환(가중합), 높이 64px 쌍선형 리사이즈, 대비 스트레칭, 글자를 어둡게 맞춤, 기울기 보정 ±10°, Otsu(선택) | 전처리 유무별 OCR 정확도 비교 | 완료(#12): 기본값 그레이+스트레칭+기울기 보정. Otsu는 2/10으로 떨어져 끔. [노트](../plate_recognition.ko.md) |
 | C-05 | 문자 인식 | `recognize(crop) -> (text, conf)` | PaddleOCR `korean`. 두 줄 번호판은 위→아래로 이음. `O`→`0`, `I`/`l`→`1`, 숫자·한글만 남김. conf는 박스 점수 중 최솟값. 형식 `^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$`(지역명 허용) | 라벨 문자열과 비교 | 완료(#12). 미국 번호판(#69): `recognize(crop, country)`는 번호 줄의 영문자·숫자를 남김. [노트](../plate_recognition.ko.md#미국-번호판) |
 | C-06 | 상태 판정 | `judge(text, conf) -> (status, text)` | `readable`: 형식 일치 + `conf` ≥ 0.8. `uncertain`: `conf` ≥ 0.5이고, 형식은 맞지만 `conf` < 0.8이거나 한 자리만 고치면 형식이 맞음(그 자리는 `?`). `unreadable`: 그 외, `text = None`. uncertain에 `?`가 필요해 text도 함께 반환 | 판정별 단위 테스트 | 완료(#12): 실제 사진에서 틀린 답이 readable로 나온 경우 0건. 미국 번호판(#69): `judge(text, conf, country)`, 숫자를 포함한 영문자·숫자 5–7자 |
 | C-07 | 통합 함수 | `detect_plates(frame, cond=None, frame_id=None) -> [PlateResult]` | 공통 인터페이스 형식. 차량당 결과 하나: 후보를 순서대로 읽다 readable이면 멈추고 가장 좋은 결과 유지. 크롭은 `results/ocr/crops/<cond>/<frame_id>_<n>.png` | 필드 누락 0건 | 완료(#14). 선택 인자는 11/17 확정 |
-| C-08 | 조건별 실행 | `run_ocr(cond)`, `python -m src.plate.run <cond>`: `frames/<cond>/` → `results/ocr/<cond>.csv` | `orig`, `fixed`, `adaptive`를 같은 프레임 목록으로. 번호판이 없는 프레임도 빈 행 하나 유지 | 세 CSV의 프레임 목록 일치 | 코드 완료(#14), 실행은 프레임 대기 |
-| C-09 | OCR 평가 | `eval_ocr(results, labels) -> dict`, `python -m src.eval.ocr` → `ocr_summary.csv` | 검출률(1:1, 작은 박스 기준 겹침 ≥ 0.5, IoU 큰 순서), 완전일치율, 문자 정확도(1 − 편집 거리 / 길이). unreadable 라벨은 별도 집계하고 과신 건수 보고. 표준이 아닌 번호판(광고용, 군용)은 `nonstandard_labels`로 따로 셈. `readable_wrong`, C-11용 `frame_char_accuracy`도 제공. B의 민감도 스크립트가 호출 가능 | 손으로 계산한 3건과 일치 | 완료(#16, #52). 라벨 형식은 [노트](../ocr_evaluation.ko.md), B의 라벨 내보내기가 이 형식으로 씀 |
-| C-10 | 전체 집계 | `aggregate(results_dir, labels=None) -> summary.csv`, `python -m src.eval.aggregate` | OCR 지표, D의 VLM 점수, `timing.csv`를 조건별로 합침 | 원본 CSV들과 수치 일치 | 완료(#24): VLM 개수는 클립을 합쳐 계산, 없는 파일은 해당 열을 빈 값으로 둠. `score.csv` 형식은 [노트](../aggregation.ko.md)에 제안 |
-| C-11 | 조건 간 비교표 | `compare(results_dir, labels) -> (비교표, 사례 목록)`, `write_compare` → `compare.csv`, `worse_cases.csv` | `orig` 대 `fixed`, `fixed` 대 `adaptive`에서 프레임별 개선·악화 건수를 모두 표시. 악화 사례는 크롭 경로와 함께 출력 | 개선 + 악화 + 변화 없음 = 전체 프레임 수 | 완료(#26): 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 셈. 시그니처는 11/17 확정. 발표용 이미지: `tools/compare_images.py`(#63), adaptive 대 fixed 목록과 자신 있게 틀린 결과 빨강 표시도 포함(#73). [노트](../comparison.ko.md) |
+| C-08 | 조건별 실행 | `run_ocr(cond)`, `python -m src.plate.run <cond>`: `frames/<cond>/` → `results/ocr/<cond>.csv` | `orig`, `fixed`, `adaptive`를 같은 프레임 목록으로. 번호판이 없는 프레임도 빈 행 하나 유지 | 세 CSV의 프레임 목록 일치 | 완료(#14). 직접 찍은 블랙박스 프레임 48장으로 세 조건과 맑은 기준 `clear`까지 실행(#78, #79). [결과](../dashcam_results.ko.md) |
+| C-09 | OCR 평가 | `eval_ocr(results, labels) -> dict`, `python -m src.eval.ocr` → `ocr_summary.csv` | 검출률(1:1, 작은 박스 기준 겹침 ≥ 0.5, IoU 큰 순서), 완전일치율, 문자 정확도(1 − 편집 거리 / 길이). unreadable 라벨은 별도 집계하고 과신 건수 보고. 표준이 아닌 번호판(광고용, 군용)은 `nonstandard_labels`로 따로 셈. `readable_wrong`, C-11용 `frame_char_accuracy`도 제공. B의 민감도 스크립트가 호출 가능 | 손으로 계산한 3건과 일치 | 완료(#16, #52). 라벨 형식은 [노트](../ocr_evaluation.ko.md), B의 라벨 내보내기가 이 형식으로 씀 맑은 기준 `clear`는 자기 프레임만으로 채점(#79) |
+| C-10 | 전체 집계 | `aggregate(results_dir, labels=None) -> summary.csv`, `python -m src.eval.aggregate` | OCR 지표, D의 VLM 점수, `timing.csv`를 조건별로 합침 | 원본 CSV들과 수치 일치 | 완료(#24): VLM 개수는 클립을 합쳐 계산, 없는 파일은 해당 열을 빈 값으로 둠. `score.csv` 형식은 [노트](../aggregation.ko.md)에 제안 시간 파일이 없으면 OCR·보정 로그에서 단계별 시간을 가져옴(#78) |
+| C-11 | 조건 간 비교표 | `compare(results_dir, labels) -> (비교표, 사례 목록)`, `write_compare` → `compare.csv`, `worse_cases.csv` | `orig` 대 `fixed`, `fixed` 대 `adaptive`에서 프레임별 개선·악화 건수를 모두 표시. 악화 사례는 크롭 경로와 함께 출력 | 개선 + 악화 + 변화 없음 = 전체 프레임 수 | 완료(#26): 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 셈. 시그니처는 11/17 확정. 발표용 이미지: `tools/compare_images.py`(#63), adaptive 대 fixed 목록과 자신 있게 틀린 결과 빨강 표시도 포함(#73). [노트](../comparison.ko.md) 이미지 맨 앞에 `clear` 열(#79). 첫 실제 결과(#78) |
 
 ## 팀원 D · 실험 실행기 + VLM + 실행 환경
 
@@ -85,7 +85,7 @@ DriveInsight · Team 16 Black Box · **최신화 2026-11-16**
 
 | ID | 기능 | 입력 → 출력 | 요구사항 | 검증 방법 | 상태 |
 | --- | --- | --- | --- | --- | --- |
-| ALL-01 | 클립 수집 | → `data/clips/`, 출처·타임스탬프 목록 | 한 사람당 맡은 조건의 클립 2–3개, 클립당 10–30초. 공개 데이터셋 또는 본인 촬영본만. 타임스탬프 3–5개, 그중 절반 이상은 번호판이 보이는 프레임. 11/8 오전 마감 | B가 `eval_set.csv`로 합칠 때 항목 누락 0건 | — |
-| ALL-02 | 정답 라벨링 | 자기 클립의 원본 프레임 → `labels/*.json` | 눈으로 확인되는 차량·사건만 기록. 번호판은 원본이나 연속 프레임으로 확실히 읽힐 때만 문자열, 아니면 unreadable | B의 스키마 검사 통과 | —(스키마 없음) |
+| ALL-01 | 클립 수집 | → `data/clips/`, 출처·타임스탬프 목록 | 한 사람당 맡은 조건의 클립 2–3개, 클립당 10–30초. 공개 데이터셋 또는 본인 촬영본만. 타임스탬프 3–5개, 그중 절반 이상은 번호판이 보이는 프레임. 11/8 오전 마감 | B가 `eval_set.csv`로 합칠 때 항목 누락 0건 | C: 직접 찍은 맑은 날 클립 11개에 합성 안개, 차량 크기로 고른 타임스탬프 48개(#77, #78) |
+| ALL-02 | 정답 라벨링 | 자기 클립의 원본 프레임 → `labels/*.json` | 눈으로 확인되는 차량·사건만 기록. 번호판은 원본이나 연속 프레임으로 확실히 읽힐 때만 문자열, 아니면 unreadable | B의 스키마 검사 통과 | C: 48프레임, 번호판 66개(readable 13개), 스키마 검사 통과. git 밖에 보관(#78) |
 | ALL-03 | 라벨 교차 검수 | 짝의 라벨 → 수정 의견 | A↔B, C↔D. 불일치 항목은 통합 점검 2(11/17)에서 확정 | 모든 라벨 파일에 검수자 표시 | — |
 | ALL-04 | VLM 사실 검증 | 다른 사람 클립의 `verify_sheet.csv` → 판정 열 채움 | A→B→C→D→A 순환. 주장마다 맞음 / 근거 없음 / 확인 불가 중 하나. 원본 프레임과 라벨 기준, 조건 이름은 가려진 상태 | 10% 표본을 한 명 더 판정해 일치율 확인 | — |

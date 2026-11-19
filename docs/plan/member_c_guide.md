@@ -11,11 +11,11 @@ C finds and reads vehicles and plates (`src/plate/`) and combines the three cond
 | | |
 | --- | --- |
 | **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72 |
-| **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips: manifest → frames → label drafts → fixed and adaptive → OCR on three conditions → evaluation, aggregation, comparison, slide images, B's package and videos, with no errors. OCR takes about 1.2–1.6 s per 1080p frame |
-| **Data** | No clips in the repo yet. The AI Hub fog data (630, Hazy) is real fog, but every plate is masked (checked 11/19), so it can't be used for OCR. OCR needs own clear-day dashcam clips with synthetic fog |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` → `orig.csv` as soon as frames exist (B, D), `eval_ocr` (B), `summary.csv` and `compare.csv` once results exist (all) |
-| **Waiting for** | Own clear-day clips and their labels (C), D's runner (#38) and `timing.csv`, VLM scores (D) |
-| **Next** | Clips → synthetic fog → labels → run the rehearsal steps on them; review D's labels and fact-check D's clips once they exist |
+| **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.5–1.8 s per 1080p frame |
+| **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19) |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
+| **Waiting for** | D's review of C's labels (ALL-03), D's runner (#38) and `timing.csv`, VLM scores (D), other members' clips and labels |
+| **Next** | Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist; final aggregation after the VLM scores |
 
 ## Schedule
 
@@ -23,27 +23,27 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 
 **Weekend (11/7–11/8)**
 
-- [ ] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01) — no public fog footage with readable plates; synthetic fog on clear-day clips with `tools/synth_fog.py` (#61), snow not synthesized. The AI Hub fog data has masked plates (11/19)
+- [x] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01) — 11 own clear-day clips with synthetic fog (#61), 48 timestamps picked by vehicle size (#77, #78); snow not synthesized. The AI Hub fog data has masked plates (11/19)
 - [x] Commit stubs: `detect_plates(frame) -> []`, `eval_ocr`, `aggregate` (#2)
 - [x] Install detectors and OCR, test 10 Korean plate photos, write the selection memo (C-01, #4, #8)
 
 **Week 1 (11/9–11/16): recognition on original frames**
 
 - [x] 11/9–11/10 Vehicle detection `detect_vehicles` (C-02, #10)
-- [ ] 11/9–11/14 Label own clips with B's schema (ALL-02) — schema ready; drafts and check images with `tools/label_draft.py` (#54)
+- [x] 11/9–11/14 Label own clips with B's schema (ALL-02) — 48 frames, 66 plates, 13 readable; drafts and check images with `tools/label_draft.py` (#54, #78)
 - [ ] 11/10 Integration Check 1: the runner calls the stubs end to end — C's side ran end to end in the 11/19 rehearsal; D's runner (#38) is not merged yet
 - [x] 11/10–11/12 Plate candidates `detect_plate_candidates` (C-03, #10)
 - [x] 11/12–11/14 Own crop preprocessing `preprocess_plate` (C-04, #12)
 - [x] 11/14–11/16 OCR and status `recognize`, `judge` (C-05, C-06, #12)
 - [ ] 11/15–11/16 Review D's labels (ALL-03) — blocked: no labels yet
 - [x] 11/16 `detect_plates` and `run_ocr` (C-07, C-08, #14)
-- [ ] 11/16 `results/ocr/orig.csv`, share with D and B — waits for original frames
+- [x] 11/16 `results/ocr/orig.csv`, share with D and B — 48 own frames (#78); share by hand, it holds plate texts
 
 **Week 2 (11/17–11/24): evaluation and aggregation**
 
 - [ ] 11/17 Integration Check 2: OCR on fixed frames, settle label disagreements (agenda below) — OCR on fixed frames ran in the rehearsal; labels still to come
 - [x] 11/17–11/19 OCR evaluation `eval_ocr`, callable from B's sensitivity script (C-09, #16)
-- [ ] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08) — ran in the rehearsal; real frames pending
+- [x] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08) — on the 48 own frames, plus `clear.csv` (#78, #79)
 - [ ] 11/20–11/22 VLM fact check of D's clips (ALL-04)
 - [x] Aggregation `aggregate`, comparison `compare` with fake CSVs (C-10, C-11, #24, #26)
 - [ ] 11/22–11/24 Rerun aggregation and comparison on real results, after the final VLM scores
@@ -80,10 +80,12 @@ python -m pytest tests/
 python tools/model_check.py <samples>          # C-01: compare detector and OCR on samples
 python tools/preprocess_check.py <samples>     # C-04: OCR with and without preprocessing
 python -m src.plate.run orig                   # C-08: data/frames/orig → results/ocr/orig.csv
+python -m src.plate.run clear                  # #79: clear reference frames → results/ocr/clear.csv
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
 python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
+python tools/pick_frames.py scan <clear>       # ALL-01: vehicle boxes, then `pick` for the window and timestamps (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
 python tools/compare_images.py                 # C-11: plate and frame images for slides (--hide 2)
 ```
@@ -152,12 +154,13 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 
 | Part | Pretrained | Own implementation |
 | --- | --- | --- |
-| Vehicle detection | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, box conversion and ordering |
+| Vehicle detection | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, camera car filter (dashboard and reflections), box conversion and ordering |
 | Plate detection | – | Candidate search: vertical edges, brightness, center-surround scores with integral images, box growing, NMS, 4 candidates per vehicle |
 | Crop preprocessing | – | Gray conversion, bilinear resize, contrast stretch, polarity, deskew, Otsu |
 | OCR | PaddleOCR 3.7.0, `korean` PP-OCRv5 models (they also read Latin letters, used for US plates), Apache-2.0 | Line joining, O/I fix, text normalization; for US plates only the plate number line |
 | Status | – | readable / uncertain / unreadable rules: Korean plate format with use characters and regions, `?` marking; US standard format |
-| Evaluation | – | Matching, detection rate, exact match, char accuracy, overconfident count, aggregation, comparison, slide images |
+| Evaluation | – | Matching, detection rate, exact match, char accuracy, overconfident count, clear reference, aggregation, comparison, slide images |
+| Timestamp pick (tool for picking frames, not part of the pipeline) | YOLOv8n boxes | Near-vehicle rule: width, side edges, side views, same view, best window |
 | Synthetic fog (tool for making clips, not part of the pipeline) | YOLOv8n-seg, Ultralytics 8.4.208, COCO weights, AGPL-3.0: vehicle masks | Fog model (Koschmieder transmission, flat-road distance, vehicle mask distance), forward-scatter blur with A's Gaussian, sensor noise |
 
 Weights: YOLO downloads to `weights/` on first run (ignored by git), YOLOv8n-seg too (a manual download link is in [synthetic_fog.md](../synthetic_fog.md)); PaddleOCR downloads to `~/.paddlex/official_models/`.
@@ -179,9 +182,10 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git), YOLOv8n-seg
 | --- | --- | --- | --- |
 | OCR reads 3 or fewer of 10 | 11/8–11/9, C-01 | Try another OCR; if still bad, focus on char accuracy | Did not happen: PaddleOCR 7/10 (EasyOCR 3/10 was dropped) |
 | Plate detector misses Korean plates | 11/10–11/12, C-03 | Own edge and ratio search in vehicle boxes; else labeled boxes + OCR only | Own search used: plate in top 3 for 10/10. In the foggy rehearsal a headlight and grille outscored the plate (4th), so 4 are kept (#72) |
-| Dashcam plates too small | 11/17 on shrunk photos, then original results | Pick timestamps with bigger plates, ask B to add them | Measured ([plate_size_check.md](../plate_size_check.md)): read well from 80 px wide, Hangul lost below that, nothing below 40 px. Guideline: plates ≥ 80 px in 1920×1080. Real frames still to check |
+| Dashcam plates too small | 11/17 on shrunk photos, then original results | Pick timestamps with bigger plates, ask B to add them | Measured ([plate_size_check.md](../plate_size_check.md)): read well from 80 px wide, Hangul lost below that. On the own clips (#78) readable plates were 62–92 px: 10 of 13 lost only the Hangul (`uncertain`), with and without fog; none was read confidently wrong |
 | Install or GPU problems | 11/8 | CPU and small (n) models | CPU works. On one PC: `pandas==2.2.3`, `chardet==5.2.0` (Windows Application Control), `enable_mkldnn=False` (PaddlePaddle 3.3 CPU), antivirus HTTPS scanning needs the OS cert store |
 | Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Schema and tools exist now (B's `tools/b_labels.py`, label drafts #55); eval, aggregation and comparison done with fake files (#16, #24, #26). Labels wait for clips |
+| Enhancement does not help on dashcam frames | 11/19, first real run (#78) | Tell A and B; rerun when they change | Fixed: char accuracy 0.81 → 0.70, 5 frames worse, none better. Adaptive: no rule fired, frames equal the originals; with the dashboard left out, 22 of 48 frames would be below `CT_LOW` ([dashcam_results.md](../dashcam_results.md)) |
 | No public fog footage with readable plates | 11/18–11/19 | Synthetic fog on own clear-day clips (#62); check AI Hub | AI Hub fog (630, Hazy): real fog, plates masked (11/19). Synthetic fog for OCR. AI Hub's policy forbids letting unapproved people view the data and needs an agreement to take it abroad |
 
 ## Final checklist before submission
@@ -190,11 +194,11 @@ When all of these hold before 11/25, C's part is done.
 
 - [x] No cv2 processing functions in `src/plate/` and `src/eval/` (only `imdecode`, `imencode` for I/O)
 - [x] No functions named `_stub`
-- [ ] `orig.csv`, `fixed.csv`, `adaptive.csv` list exactly the same frames — needs frames
+- [x] `orig.csv`, `fixed.csv`, `adaptive.csv` list exactly the same frames — 48 each, `missing_frames` 0 (#78)
 - [x] Every result row has `bbox`, `crop_path`, `text`, `conf`, `status`, and `text` is `None` when `unreadable` (tests)
 - [x] `eval_ocr` matches 3 hand-computed cases (#16)
 - [x] Better + worse + unchanged = compared frames in the comparison (#26, tests)
 - [x] Model name, version, weight source and license of the detector and OCR in the selection memo
 - [ ] "Pretrained vs own" table given to D for the README — table ready above (updated 11/19)
 - [ ] README explains how weights are downloaded — automatic in code; README is D's
-- [ ] 3 better and 3 worse crop images for the slides — worse ones from `worse_cases.csv`, better ones by hand, once real results exist
+- [ ] 3 better and 3 worse crop images for the slides — on the own clips no plate read better in fixed or adaptive than in orig; `worse.png` (5 plates) and `better_vs_fixed.png` exist (#78)
