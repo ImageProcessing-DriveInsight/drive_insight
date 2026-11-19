@@ -17,6 +17,7 @@ VEHICLE_CLASSES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}  # COCO clas
 VEHICLE_CONF = 0.4
 OWN_CAR_WIDTH = 0.6  # share of the frame width
 OWN_CAR_BOTTOM = 0.95  # share of the frame height, from the top
+OWN_CAR_TOP = 0.75  # share of the frame height: a box starting below this row is on the dashboard
 CROP_MARGIN = 0.1  # border added around a candidate before OCR and saving
 STATUS_RANK = {"readable": 2, "uncertain": 1, "unreadable": 0}
 
@@ -33,15 +34,17 @@ def _vehicle_model():
 
 
 def own_car(box, width, height):
-    """True for the camera car's own hood or dashboard, which YOLO calls a car.
+    """True for the camera car's own hood or dashboard, or a reflection on it, which YOLO calls a car.
 
-    It is a box at least OWN_CAR_WIDTH of the frame wide whose bottom reaches the bottom 5 %
-    of the frame. On 11 own dashcam clips every such box (0.84-0.99 of the width, bottom at
-    rows 1055-1066 of 1080, just above the dashcam's text strip) was the dashboard; no other
-    vehicle reached that band (#78).
+    Either a box at least OWN_CAR_WIDTH of the frame wide whose bottom reaches the bottom 5 %
+    of the frame, or a box that starts in the bottom quarter. On 11 own dashcam clips every
+    wide box reaching the bottom (0.84-0.99 of the width, bottom at rows 1055-1066 of 1080,
+    just above the dashcam's text strip) was the dashboard, and every box starting in the bottom
+    quarter (rows 821-837) was a car reflected on it. No real vehicle started below row 700:
+    a vehicle that close rises above the hood (#78).
     """
     x, y, w, h = box
-    return w >= OWN_CAR_WIDTH * width and y + h >= OWN_CAR_BOTTOM * height
+    return (w >= OWN_CAR_WIDTH * width and y + h >= OWN_CAR_BOTTOM * height) or y >= OWN_CAR_TOP * height
 
 
 def detect_vehicles(img) -> list[dict]:
