@@ -61,6 +61,7 @@ python -m src.eval.compare --labels data/labels    # C-11: compare.csv, worse_ca
 python tools/compare_images.py                      # results/figures/: better.png, worse.png, *_vs_fixed.png, frames/
 python tools/compare_images.py --hide 2             # 라벨 번호판마다 마지막 2글자를 가림
 python tools/compare_images.py --frames fog_01_3500 # 고른 프레임의 프레임 이미지
+python tools/plate_report.py                       # OCR, 평가, 집계, 비교, 이 이미지까지 한 번에 (#81)
 ```
 
 | 이미지 | 내용 |

@@ -61,6 +61,7 @@ Like `results/ocr/<cond>.csv`, this file contains plate text.
 python tools/compare_images.py                      # results/figures/: better.png, worse.png, *_vs_fixed.png, frames/
 python tools/compare_images.py --hide 2             # last 2 characters of every labeled plate covered
 python tools/compare_images.py --frames fog_01_3500 # frame images for chosen frames
+python tools/plate_report.py                       # OCR, evaluation, aggregation, comparison and these images in one run (#81)
 ```
 
 | Image | What it shows |

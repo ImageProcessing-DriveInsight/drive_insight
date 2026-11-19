@@ -19,9 +19,7 @@ Only numbers are here. Clips, frames, labels, crops, slide images and plate text
 | Labels | C, from zoomed crops: text spelled on the clear frame, status judged on the foggy frame (`readable` only if every character can be read there). 66 plates: 13 readable (10 different plates; one car is in 3 frames), 53 unreadable. Plates narrower than about 40 px and plates hidden behind other cars are not labeled. One plate whose Hangul could not be settled at its closest clear view is labeled unreadable. Not reviewed by D yet (ALL-03) |
 
 ```bash
-python -m src.plate.run orig && python -m src.plate.run fixed && python -m src.plate.run adaptive && python -m src.plate.run clear
-python -m src.eval.ocr --labels data/labels && python -m src.eval.aggregate && python -m src.eval.compare
-python tools/compare_images.py
+python tools/plate_report.py    # OCR on every condition, evaluation, aggregation, comparison, slide images (#81)
 ```
 
 ## Results
