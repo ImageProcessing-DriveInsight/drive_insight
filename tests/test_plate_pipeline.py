@@ -119,3 +119,12 @@ def test_run_ocr_uses_the_country_of_each_frame(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "detect_plates", fake_detect)
     run.run_ocr("orig", frames_dir=frames, results_dir=tmp_path / "results", countries={"us": ["bdd_*"]})
     assert seen == {"bdd_01_100": {"country": "us"}, "fog_01_100": {}}  # Korean frames: same call as before
+
+
+def test_run_ocr_reads_the_clear_reference(tmp_path, monkeypatch):
+    frames = tmp_path / "frames" / "clear"
+    save_png(frames / "fog_01_100.png", np.zeros((48, 64, 3), np.uint8))
+    seen = []
+    monkeypatch.setattr(run, "detect_plates", lambda frame, cond, frame_id, results_dir: seen.append(cond) or [])
+    out = run.run_ocr("clear", frames_dir=frames, results_dir=tmp_path / "results")
+    assert out == tmp_path / "results" / "ocr" / "clear.csv" and seen == ["clear"]

@@ -147,3 +147,16 @@ def test_stage_logs_time_conditions_without_a_timing_file(tmp_path):
     assert (s["orig"]["ocr_ms"], s["orig"]["enhance_ms"], s["orig"]["total_ms"]) == ("1200.0", "", "")
     assert (s["fixed"]["ocr_ms"], s["fixed"]["enhance_ms"]) == ("1200.0", "160.0")
     assert (s["adaptive"]["ocr_ms"], s["adaptive"]["total_ms"]) == ("8.0", "15.0")
+
+
+def test_clear_reference_row_comes_after_the_conditions(tmp_path):
+    write_csv(tmp_path / "ocr" / "clear.csv", PLATE_HEADER,
+              [["a.png", 0, 10, 10, 100, 30, "c.png", "12가3456", 0.95, "readable", 1500]])
+    write_csv(tmp_path / "ocr" / "orig.csv", PLATE_HEADER,
+              [["a.png", "", "", "", "", "", "", "", "", "", 1500], ["b.png", "", "", "", "", "", "", "", "", "", 900]])
+    labels = {"a.png": [{"bbox": [12, 10, 100, 30], "text": "12가3456"}], "b.png": [{"bbox": [0, 0, 90, 28], "text": "34나5678"}]}
+    aggregate(tmp_path, labels)
+    s = read_summary(tmp_path)
+    assert list(s) == ["orig", "clear"]
+    assert (s["orig"]["plates"], s["orig"]["detection_rate"]) == ("2", "0.0")
+    assert (s["clear"]["plates"], s["clear"]["exact_match"]) == ("1", "1.0")
