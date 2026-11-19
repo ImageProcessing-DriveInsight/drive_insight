@@ -107,7 +107,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 ### C-02, C-03 Detection — `src/plate/detect.py`, `src/plate/candidates.py`
 
 - `detect_vehicles`: car, truck, bus, motorcycle with `conf` ≥ 0.4, bbox `(x, y, w, h)`, largest first.
-- `detect_plate_candidates` (own): search below 35% of each vehicle box; score every window by vertical edge density and brightness minus a ring around it (integral images); 8 widths × 3 aspect ratios (2:1, 3:1, 4.5:1); grow the best window while the edge profile stays dense; NMS; top 3 per vehicle.
+- `detect_plate_candidates` (own): search below 35% of each vehicle box; score every window by vertical edge density and brightness minus a ring around it (integral images); 8 widths × 3 aspect ratios (2:1, 3:1, 4.5:1); grow the best window while the edge profile stays dense; NMS; top 4 per vehicle (3 until #71).
 - Real photos: plate in the top 3 for 10/10, first for 8/10. The brightness term found a plate next to a busy grille; growing fixed boxes that covered only the middle characters.
 
 ### C-04 to C-06 Recognition — [docs/plate_recognition.md](../plate_recognition.md)
