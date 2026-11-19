@@ -10,7 +10,7 @@ at the plate search or OCR, so it does not favor frames the pipeline already rea
 
 scan   vehicle boxes every --step-ms of a clear clip -> <clip>.vehicles.json next to it
 pick   the window of --length-ms with the most qualifying frames at least --gap-ms apart
-       (then the widest vehicles); prints the synth_fog.py make range and adds manifest
+       and not showing the same view (then the widest vehicles); prints the synth_fog.py make range and adds manifest
        rows for the foggy clip, with timestamps in the foggy clip's time
 
 Scan files hold boxes only, no images. They stay next to the clear clips in data/clear/,
@@ -40,6 +40,7 @@ MAX_ASPECT = 2.5  # w/h; rear three-quarter views up to about 2.4 still showed t
 STEP_MS = 500
 LENGTH_MS = 20000  # foggy clips are 10-30 s
 GAP_MS = 3000  # neighboring frames of one car are nearly the same plate
+SAME_VIEW = 0.7  # IoU of the widest boxes: a car standing still in a jam is the same view
 MAX_FRAMES = 5  # 3-5 timestamps per clip
 MANIFEST = ROOT / "data" / "manifests" / "member_c.csv"
 FIELDS = ["clip", "timestamp_ms", "condition", "source", "license"]
@@ -90,19 +91,34 @@ def scan(source, step_ms=STEP_MS, detector=None, out=None):
     return record
 
 
+def near_box(vehicles, width, edge=EDGE, max_aspect=MAX_ASPECT):
+    """The widest vehicle box seen from behind or the front, not cut by the left or right
+    frame edge, or None."""
+    inside = [b for b in (v["bbox"] for v in vehicles)
+              if b[0] >= edge and b[0] + b[2] <= width - edge and b[2] <= max_aspect * b[3]]
+    return max(inside, key=lambda b: b[2], default=None)
+
+
 def near_width(vehicles, width, edge=EDGE, max_aspect=MAX_ASPECT):
-    """Width of the widest vehicle box seen from behind or the front, not cut by the left or
-    right frame edge (0 if none)."""
-    inside = [w for x, y, w, h in (v["bbox"] for v in vehicles)
-              if x >= edge and x + w <= width - edge and w <= max_aspect * h]
-    return max(inside, default=0)
+    """Width of near_box (0 if none)."""
+    box = near_box(vehicles, width, edge, max_aspect)
+    return box[2] if box else 0
 
 
-def choose(frames, gap_frames, max_frames):
-    """Widest first, each at least gap_frames from the ones kept. Returns them in time order."""
+def iou(a, b):
+    w = min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0])
+    h = min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1])
+    inter = max(0, w) * max(0, h)
+    return inter / (a[2] * a[3] + b[2] * b[3] - inter)
+
+
+def choose(frames, gap_frames, max_frames, same_view=SAME_VIEW):
+    """Widest first, each at least gap_frames from the ones kept and with its box overlapping
+    none of theirs by IoU >= same_view. Returns them in time order."""
     kept = []
     for f in sorted(frames, key=lambda f: (-f["width"], f["index"])):
-        if len(kept) < max_frames and all(abs(f["index"] - k["index"]) >= gap_frames for k in kept):
+        if len(kept) < max_frames and all(abs(f["index"] - k["index"]) >= gap_frames
+                                          and iou(f["box"], k["box"]) < same_view for k in kept):
             kept.append(f)
     return sorted(kept, key=lambda f: f["index"])
 
@@ -118,8 +134,8 @@ def pick(record, length_ms=LENGTH_MS, gap_ms=GAP_MS, max_frames=MAX_FRAMES, min_
     if length_ms <= 0 or gap_ms < 0 or max_frames < 1:
         raise ValueError("need length_ms > 0, gap_ms >= 0 and max_frames >= 1")
     limit = min_width * record["width"] / REF_WIDTH
-    good = [{"index": f["index"], "ms": f["ms"], "width": w} for f in record["frames"]
-            if (w := near_width(f["vehicles"], record["width"])) >= limit]
+    boxes = [(f, near_box(f["vehicles"], record["width"])) for f in record["frames"]]
+    good = [{"index": f["index"], "ms": f["ms"], "width": b[2], "box": b} for f, b in boxes if b and b[2] >= limit]
     gap_frames = gap_ms * fps / 1000
     best = None
     for start in [f["ms"] for f in record["frames"]]:
@@ -134,6 +150,7 @@ def pick(record, length_ms=LENGTH_MS, gap_ms=GAP_MS, max_frames=MAX_FRAMES, min_
         return None
     _, start, first, kept = best
     for f in kept:
+        del f["box"]
         f["clip_ms"] = round((f["index"] - first) * 1000 / fps)
         assert frame_index(f["clip_ms"], fps) == f["index"] - first
     return {"start_ms": start, "end_ms": start + length_ms, "first_frame": first, "frames": kept}
