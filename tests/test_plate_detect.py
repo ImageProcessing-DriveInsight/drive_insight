@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import pytest
 
-from src.plate.candidates import box_sums, detect_plate_candidates, grow_box, integral, iou
+from src.plate.candidates import TOP_K, box_sums, detect_plate_candidates, grow_box, integral, iou
 from src.plate.detect import WEIGHTS, detect_vehicles
 from src.plate.imgutil import to_gray
 
@@ -36,6 +36,19 @@ def test_candidates_without_vehicles_search_whole_frame():
     for x, y, w, h in cands:
         assert x >= 0 and y >= 0 and x + w <= img.shape[1] and y + h <= img.shape[0]
     assert any(iou(c, PLATE) >= 0.5 for c in cands)
+
+
+def test_candidates_keep_four_per_vehicle():
+    """Five plate-like patches on one car: four candidates are kept (#71). In fog a headlight and
+    grille can outscore the plate, and in the rehearsal the plate was the 4th candidate."""
+    img = np.full((480, 640, 3), 90, dtype=np.uint8)
+    img[100:400, 100:540] = 60
+    for x, y in ((120, 230), (330, 230), (120, 300), (330, 300), (225, 360)):
+        img[y:y + 20, x:x + 90] = 230
+        for cx in range(x + 6, x + 84, 11):
+            img[y + 3:y + 17, cx:cx + 4] = 20
+    assert TOP_K == 4
+    assert len(detect_plate_candidates(img, VEHICLE)) == TOP_K
 
 
 def test_candidates_reject_bad_input():
