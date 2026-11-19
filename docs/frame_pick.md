@@ -55,7 +55,8 @@ manifests, extract the frames, save the clear reference frames and draft the lab
 - **The camera car's dashboard is a "car".** In 6 of 11 clips YOLO found boxes 0.84–0.99 of the
   frame wide ending at rows 1055–1066, just above the dashcam's text strip (53 sampled frames); it was the dashboard
   every time. It was the widest box, so it would have been picked, and it got plate candidates.
-  `detect_vehicles` now drops it.
+  In 2 clips cars reflected on the dashboard were found too (11 boxes starting at rows 821–837).
+  `detect_vehicles` now drops both.
 - **The files hold fewer frames than they list.** The first 0.96 s (29 frames) of a loop-recorded
   file does not decode; the rest is continuous. `scan` counts the frames that decode, so a window
   never reaches past them. Frame times are shifted by the same amount everywhere, so the foggy clip,

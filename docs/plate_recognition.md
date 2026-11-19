@@ -67,9 +67,13 @@ sampled frames had such a box: 0.84–0.99 of the frame wide, ending at rows 105
 above the dashcam's text strip. It was the widest box, so it came first, and its lower part was
 searched for plates. No other vehicle reached the bottom 5 % of the frame.
 
-`detect_vehicles` drops a box that is at least 0.6 of the frame wide and ends in the bottom 5 %
-(`own_car`). The synthetic fog masks drop it too: it was found in some frames only, so its fog
-would flicker ([synthetic fog](synthetic_fog.md#watch-out)).
+It also found cars reflected on the dashboard: 11 sampled boxes in 2 clips, 140–197 px wide,
+starting at rows 821–837 and ending near row 900. No real vehicle box started below row 700; a
+vehicle that close rises above the hood.
+
+`detect_vehicles` drops a box that is at least 0.6 of the frame wide and ends in the bottom 5 %,
+or that starts in the bottom quarter (`own_car`). The synthetic fog masks drop them too: they were
+found in some frames only, so their fog would flicker ([synthetic fog](synthetic_fog.md#watch-out)).
 
 ## Preprocessing (C-04)
 
