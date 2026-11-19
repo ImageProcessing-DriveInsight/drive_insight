@@ -45,8 +45,12 @@ I = J·t + A·(1 − t)      t = exp(−β·d)      β = 3.912 / 가시거리
 ## 작업 순서
 
 맑은 원본 영상은 `data/clips/`가 아니라 `data/clear/`(git 제외)에 둡니다.
+구간과 타임스탬프는 먼저 OCR 없이 차량 크기로 고릅니다([타임스탬프 고르기](frame_pick.ko.md)).
 
 ```bash
+# 0. 구간과 타임스탬프. 3단계의 매니페스트 행을 추가하고 make 구간을 출력
+python tools/pick_frames.py scan data/clear/day_01.mp4
+python tools/pick_frames.py pick data/clear/day_01.mp4 --clip fog_01.mp4 --density medium
 # 1. 한 프레임을 맑은 것·안개 낀 것 나란히. 빨간 선이 지평선 행
 python tools/synth_fog.py preview data/clear/day_01.mp4 --at 5000 --horizon 0.45
 # 2. 안개 클립(10–30초)과 설정 파일 data/clips/fog_01.fog.json
@@ -77,6 +81,9 @@ python tools/label_draft.py draft --frames data/frames/clear --only "fog_*"
 ## 주의할 점
 
 - 언덕, 커브, 기울어진 카메라에서는 평평한 도로 가정이 맞지 않습니다.
+- 촬영 차량의 대시보드는 아래쪽 행에 있어 그 행의 도로 거리를 받습니다. 차 안에 있는데도 안개가 조금
+  끼는 셈입니다. YOLOv8n-seg는 일부 프레임에서만 이것을 차로 찾았는데, 이 마스크는 뺍니다(`own_car`, #78).
+  그래서 대시보드의 안개는 프레임마다 같습니다.
 - 마스크 모델이 놓친 차량은 행마다 도로 거리를 받아서 윗부분이 배경처럼 흐려집니다. 마스크는
   프레임마다 찾으므로 차량 가장자리가 조금 떨릴 수 있습니다.
 - 가중치 `weights/yolov8n-seg.pt`(7 MB, git 제외)는 처음 실행할 때 받습니다. 인증서 오류로 실패하면

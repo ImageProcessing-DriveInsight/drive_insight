@@ -45,8 +45,13 @@ results, and never change it based on OCR or VLM scores.
 ## Workflow
 
 Keep the clear source clips in `data/clear/` (ignored by git), not in `data/clips/`.
+Pick the window and its timestamps first, by vehicle size and without OCR
+([picking timestamps](frame_pick.md)):
 
 ```bash
+# 0. window and timestamps; adds the manifest rows of step 3 and prints the make range
+python tools/pick_frames.py scan data/clear/day_01.mp4
+python tools/pick_frames.py pick data/clear/day_01.mp4 --clip fog_01.mp4 --density medium
 # 1. one frame, clear and foggy side by side; the red line is the horizon row
 python tools/synth_fog.py preview data/clear/day_01.mp4 --at 5000 --horizon 0.45
 # 2. foggy clip (10-30 s) and its settings file data/clips/fog_01.fog.json
@@ -77,6 +82,9 @@ Share the file with the clip and quote the settings in the report.
 ## Watch out
 
 - Hills, curves and a tilted camera break the flat-road assumption.
+- The camera car's own dashboard is in the bottom rows and gets the road distance of its rows, so it
+  is fogged a little although it is inside the car. YOLOv8n-seg found it as a car in some frames
+  only; its mask is dropped (`own_car`, #78), so its fog stays the same from frame to frame.
 - A vehicle the mask model misses gets the road distance of each row, so its top fades like the
   background. Masks are found per frame, so vehicle edges can shimmer a little.
 - The weights `weights/yolov8n-seg.pt` (7 MB, ignored by git) download on first use. If the
