@@ -12,6 +12,9 @@ readable by eye.
 A US plate (frames listed in data/plate_countries.json, see src.plate.country) is written in
 upper-case letters and digits without spaces, e.g. "7ABC123".
 
+The clear reference (results/ocr/clear.csv, #79) is scored only on its own frames: only the
+synthetic fog frames have a clear frame.
+
 Usage:
     python -m src.eval.ocr [--labels data/labels] [--results results] [--countries FILE]
 """
@@ -26,6 +29,7 @@ from src.plate.judge import is_standard as plate_format_ok
 
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("orig", "fixed", "adaptive")
+REFERENCE = "clear"  # clear frames of the synthetic fog clips (src.plate.run clear)
 MATCH_OVERLAP = 0.5  # share of the smaller box that must overlap
 OCR_METRICS = ["detection_rate", "exact_match", "char_accuracy", "overconfident"]
 SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", "nonstandard_labels", *OCR_METRICS,
@@ -226,6 +230,24 @@ def plate_details(results, labels, countries=None) -> dict:
     return out
 
 
+def own_frames(results, labels):
+    """The labels of the frames in results only."""
+    frames = set(load_results(results))
+    return {f: plates for f, plates in load_labels(labels).items() if f in frames}
+
+
+def eval_conditions(results_dir, labels, countries=None) -> list[dict]:
+    """[{"condition", **eval_ocr}] for each results_dir/ocr/<cond>.csv found: orig, fixed and
+    adaptive on all labels, then the clear reference on the labels of its own frames."""
+    rows = []
+    for cond in (*CONDITIONS, REFERENCE):
+        path = Path(results_dir) / "ocr" / f"{cond}.csv"
+        if path.exists():
+            labs = own_frames(path, labels) if cond == REFERENCE else labels
+            rows.append({"condition": cond, **eval_ocr(path, labs, countries)})
+    return rows
+
+
 def write_summary(rows, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -243,12 +265,7 @@ def main():
     ap.add_argument("--results", type=Path, default=ROOT / "results")
     ap.add_argument("--countries", type=Path, help="plate country of each frame, default: data/plate_countries.json")
     args = ap.parse_args()
-    countries = load_countries(args.countries)
-    rows = []
-    for cond in CONDITIONS:
-        path = args.results / "ocr" / f"{cond}.csv"
-        if path.exists():
-            rows.append({"condition": cond, **eval_ocr(path, args.labels, countries)})
+    rows = eval_conditions(args.results, args.labels, load_countries(args.countries))
     if not rows:
         raise SystemExit(f"no {args.results / 'ocr'}/<cond>.csv found")
     out = write_summary(rows, args.results / "ocr" / "ocr_summary.csv")

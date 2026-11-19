@@ -1,9 +1,12 @@
 """Run plate recognition over one condition's frames (C-08).
 
 Plate country per frame comes from data/plate_countries.json (see src.plate.country).
+`clear` reads the clear frames of the synthetic fog clips (tools/synth_fog.py reference,
+data/frames/clear/), a reference for how well the plates read without fog (#79).
 
 Usage:
     python -m src.plate.run orig [--frames DIR] [--results DIR] [--countries FILE]
+    python -m src.plate.run clear
 """
 
 import argparse
@@ -18,6 +21,7 @@ from .imgutil import load_png
 
 FRAMES = ROOT / "data" / "frames"
 CONDITIONS = ("orig", "fixed", "adaptive")
+REFERENCE = "clear"  # clear frames the synthetic fog was made from; not an enhancement condition
 COLUMNS = ["frame", "plate", "x", "y", "w", "h", "crop_path", "text", "conf", "status", "ocr_ms"]
 
 
@@ -31,8 +35,8 @@ def run_ocr(cond, frames_dir=None, results_dir=None, countries=None) -> Path:
     Returns:
         Path to the CSV.
     """
-    if cond not in CONDITIONS:
-        raise ValueError(f"cond must be one of {CONDITIONS}")
+    if cond not in (*CONDITIONS, REFERENCE):
+        raise ValueError(f"cond must be one of {(*CONDITIONS, REFERENCE)}")
     frames_dir = Path(frames_dir or FRAMES / cond)
     results_dir = Path(results_dir or RESULTS)
     paths = sorted(frames_dir.glob("*.png"))
@@ -67,7 +71,7 @@ def run_ocr(cond, frames_dir=None, results_dir=None, countries=None) -> Path:
 
 def main():
     ap = argparse.ArgumentParser(description="Run plate recognition over one condition's frames.")
-    ap.add_argument("cond", choices=CONDITIONS)
+    ap.add_argument("cond", choices=(*CONDITIONS, REFERENCE))
     ap.add_argument("--frames", type=Path, help="default: data/frames/<cond>")
     ap.add_argument("--results", type=Path, help="default: results")
     ap.add_argument("--countries", type=Path, help="plate country of each frame, default: data/plate_countries.json")

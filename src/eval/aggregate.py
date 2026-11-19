@@ -19,7 +19,7 @@ import csv
 import json
 from pathlib import Path
 
-from .ocr import CONDITIONS, eval_ocr
+from .ocr import CONDITIONS, eval_conditions
 
 ROOT = Path(__file__).resolve().parents[2]
 OCR_COLUMNS = ["plates", "detection_rate", "exact_match", "char_accuracy", "overconfident", "readable_wrong"]
@@ -75,8 +75,7 @@ def ocr_metrics(results_dir, labels=None):
     """{cond: OCR metrics}. Scores ocr/<cond>.csv when labels are given, else reads ocr/ocr_summary.csv."""
     ocr_dir = Path(results_dir) / "ocr"
     if labels is not None:
-        return {cond: eval_ocr(ocr_dir / f"{cond}.csv", labels)
-                for cond in CONDITIONS if (ocr_dir / f"{cond}.csv").exists()}
+        return {r.pop("condition"): r for r in eval_conditions(results_dir, labels)}
     return {cond: {k: num(rs[0].get(k)) for k in OCR_COLUMNS}
             for cond, rs in by_condition(read_rows(ocr_dir / "ocr_summary.csv")).items()}
 
