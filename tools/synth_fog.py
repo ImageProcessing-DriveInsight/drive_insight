@@ -141,10 +141,12 @@ _seg_model = None
 def vehicle_masks(frame):
     """Vehicle masks (bool, H x W) from YOLOv8n-seg, with the pipeline's classes and threshold.
 
-    Masks run a little past the vehicle, so they are shrunk by 2 px per 1080 rows.
+    Masks run a little past the vehicle, so they are shrunk by 2 px per 1080 rows. The camera
+    car's own dashboard is dropped like in detect_vehicles; it was found in some frames only, so
+    its fog would flicker.
     """
     global _seg_model
-    from src.plate.detect import VEHICLE_CLASSES, VEHICLE_CONF
+    from src.plate.detect import VEHICLE_CLASSES, VEHICLE_CONF, own_car
 
     if _seg_model is None:
         from ultralytics import YOLO  # heavy import, load once
@@ -152,8 +154,12 @@ def vehicle_masks(frame):
         _seg_model = YOLO(str(SEG_WEIGHTS))
     r = _seg_model.predict(frame, conf=VEHICLE_CONF, classes=list(VEHICLE_CLASSES), retina_masks=True,
                            verbose=False)[0]
-    n = max(1, round(2 * frame.shape[0] / 1080))
-    return [] if r.masks is None else [shrink(m > 0.5, n) for m in r.masks.data.cpu().numpy()]
+    if r.masks is None:
+        return []
+    height, width = frame.shape[:2]
+    n = max(1, round(2 * height / 1080))
+    return [shrink(m > 0.5, n) for m, (x1, y1, x2, y2) in zip(r.masks.data.cpu().numpy(), r.boxes.xyxy.tolist())
+            if not own_car((x1, y1, x2 - x1, y2 - y1), width, height)]
 
 
 def add_fog(frame, fog, rng, masks=()):
