@@ -110,3 +110,25 @@ def test_frames_option_and_missing_conditions(run):
     (results / "ocr" / "orig.csv").unlink()
     with pytest.raises(FileNotFoundError):
         collect(results, labels)
+
+
+def test_clear_reference_column(run):
+    """ocr/clear.csv for a.png only: clear comes first, b.png has no clear read, and the lists still
+    compare orig, fixed and adaptive."""
+    results, labels, frames = run
+    save_png(frames / "clear" / "a.png", np.full((H, W, 3), 220, np.uint8))
+    x, y, w, h = LABELS["a.png"][0]["bbox"]
+    with (results / "ocr" / "clear.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=HEADER, restval="")
+        writer.writeheader()
+        writer.writerow({"frame": "a.png", "plate": 0, "x": x, "y": y, "w": w, "h": h, "text": "12가3456",
+                         "conf": 0.95, "status": "readable", "ocr_ms": 1})
+    conds, rows = collect(results, labels)
+    assert conds == ["clear", "orig", "fixed", "adaptive"]
+    a, b = sorted(rows, key=lambda r: r["frame"])
+    assert a["reads"]["clear"]["char_acc"] == 1.0 and b["reads"]["clear"] is None
+    assert read_of(None) == "no clear frame"
+    assert change(a) == (pytest.approx(2 / 7), pytest.approx(2 / 7))  # clear is not compared
+    paths = write_images(results, labels, frames)
+    frame_a = np.asarray(Image.open(results / "figures" / "frames" / "a.png"))
+    assert frame_a.shape[1] == 4 * 640 + 3 * 12 and len(paths) == 5

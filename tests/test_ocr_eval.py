@@ -176,3 +176,25 @@ def test_us_labels_use_the_us_format(tmp_path):
     path.write_text(json.dumps(countries), encoding="utf-8")
     assert ev.eval_ocr(results, labels, path) == s  # a country file works the same
     assert ev.is_standard("7ABC123", "us") and not ev.is_standard("7ABC123")
+
+
+def test_clear_reference_is_scored_on_its_own_frames(tmp_path):
+    """orig is scored on both labeled frames; clear has a frame only for a.png (synthetic fog), so
+    b.png is neither missing nor a missed plate there."""
+    ocr_dir = tmp_path / "ocr"
+    ocr_dir.mkdir()
+    fields = ["frame", "plate", "x", "y", "w", "h", "crop_path", "text", "conf", "status", "ocr_ms"]
+    for cond, frames in [("orig", ["a.png", "b.png"]), ("clear", ["a.png"])]:
+        with open(ocr_dir / f"{cond}.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for frame in frames:
+                w.writerow({"frame": frame, "plate": 0, "x": 0, "y": 0, "w": 100, "h": 30, "text": "12가3456",
+                            "conf": 0.9, "status": "readable"})
+    labels = {"a.png": [{"bbox": [0, 0, 100, 30], "text": "12가3456"}],
+              "b.png": [{"bbox": [0, 0, 100, 30], "text": "34나5678"}]}
+    rows = {r["condition"]: r for r in ev.eval_conditions(tmp_path, labels)}
+    assert list(rows) == ["orig", "clear"]
+    assert (rows["orig"]["frames"], rows["orig"]["plates"], rows["orig"]["exact_match"]) == (2, 2, 0.5)
+    assert (rows["clear"]["frames"], rows["clear"]["plates"], rows["clear"]["exact_match"]) == (1, 1, 1.0)
+    assert rows["clear"]["missing_frames"] == 0
