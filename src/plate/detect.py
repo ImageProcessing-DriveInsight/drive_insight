@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 from .candidates import detect_plate_candidates, iou
+from .country import check_country
 from .imgutil import save_png, validate_frame
 from .judge import judge
 from .ocr import recognize
@@ -58,10 +59,10 @@ def padded_crop(frame, box, margin=CROP_MARGIN):
     return frame[y0:y1, x0:x1]
 
 
-def read_plate(crop):
+def read_plate(crop, country="kr"):
     """preprocess -> OCR -> judge. Returns (status, text, conf)."""
-    text, conf = recognize(preprocess_plate(crop))
-    status, text = judge(text, conf)
+    text, conf = recognize(preprocess_plate(crop), country)
+    status, text = judge(text, conf, country)
     return status, text, round(conf, 4)
 
 
@@ -73,7 +74,7 @@ def relative(path):
         return path.as_posix()
 
 
-def detect_plates(frame, cond=None, frame_id=None, results_dir=None) -> list[dict]:
+def detect_plates(frame, cond=None, frame_id=None, results_dir=None, country="kr") -> list[dict]:
     """Detect and read license plates in one frame: one result per vehicle.
 
     For each vehicle, its plate candidates are read in order until one is
@@ -87,6 +88,7 @@ def detect_plates(frame, cond=None, frame_id=None, results_dir=None) -> list[dic
         frame_id: crop file name prefix, e.g. "<clip>_<ms>". Defaults to a hash
             of the frame, so the same frame always gets the same name.
         results_dir: defaults to <project>/results.
+        country: plate country, "kr" or "us" (see src.plate.country).
 
     Returns:
         List of {"bbox": (x, y, w, h), "crop_path": str, "text": str | None,
@@ -95,6 +97,7 @@ def detect_plates(frame, cond=None, frame_id=None, results_dir=None) -> list[dic
         project root when it is inside it.
     """
     validate_frame(frame)
+    check_country(country)
     crop_dir = Path(results_dir or RESULTS) / "ocr" / "crops" / (cond or "misc")
     frame_id = frame_id or hashlib.sha1(frame.tobytes()).hexdigest()[:12]
 
@@ -105,7 +108,7 @@ def detect_plates(frame, cond=None, frame_id=None, results_dir=None) -> list[dic
         best = None
         for box in candidates:  # best candidate first
             crop = padded_crop(frame, box)
-            status, text, conf = read_plate(crop)
+            status, text, conf = read_plate(crop, country)
             if best is None or (STATUS_RANK[status], conf) > (STATUS_RANK[best[1]], best[3]):
                 best = (box, status, text, conf, crop)
             if status == "readable":
