@@ -8,7 +8,7 @@ Crop → `preprocess_plate` (own) → `recognize` (PaddleOCR) → `judge` (own r
 
 `detect_plates(frame, cond=None, frame_id=None)` gives one result per vehicle:
 
-1. `detect_vehicles` (YOLOv8n), largest first
+1. `detect_vehicles` (YOLOv8n), largest first, without the camera car's own dashboard ([Camera car](#camera-car-78))
 2. `detect_plate_candidates` for that vehicle (top 4, see [Four candidates](#four-candidates-71))
 3. Each candidate with a 10% border: preprocess → OCR → judge, in order, stopping at the first readable one
 4. Keep the best read (status, then conf) and save its crop to `results/ocr/crops/<cond>/<frame_id>_<n>.png`
@@ -56,6 +56,17 @@ rehearsal frames the plate was never below 4th.
 
 A shape filter was tried first: dropping grown boxes less than 1.5 times as wide as tall removed
 the square box on the headlight, but a 1.51:1 box on the same headlight took its place.
+
+### Camera car (#78)
+
+On the own dashcam clips YOLO calls the camera car's dashboard a car. In 6 of 11 clips, 53 of 1,313
+sampled frames had such a box: 0.84–0.99 of the frame wide, ending at rows 1055–1066 of 1080, just
+above the dashcam's text strip. It was the widest box, so it came first, and its lower part was
+searched for plates. No other vehicle reached the bottom 5 % of the frame.
+
+`detect_vehicles` drops a box that is at least 0.6 of the frame wide and ends in the bottom 5 %
+(`own_car`). The synthetic fog masks drop it too: it was found in some frames only, so its fog
+would flicker ([synthetic fog](synthetic_fog.md#watch-out)).
 
 ## Preprocessing (C-04)
 
