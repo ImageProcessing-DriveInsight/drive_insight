@@ -12,11 +12,13 @@ H, W = 48, 64
 
 
 def record(widths, fps=10.0, width=1920, step_ms=1000, count=None):
-    """Scan record with one centered vehicle of the given width per sampled frame (0 = none)."""
+    """Scan record with one vehicle of the given width per sampled frame (0 = none), placed
+    differently in each frame so that no two frames show the same view."""
     frames = []
     for k, w in enumerate(widths):
         ms = k * step_ms
-        vehicles = [{"bbox": [(width - w) // 2, 10, w, w // 2], "cls": "car", "conf": 0.9}] if w else []
+        x, y = 4 + (k * 160) % 1200 * width // 1920, 10 + (k * 50) % 400
+        vehicles = [{"bbox": [x, y, w, w // 2], "cls": "car", "conf": 0.9}] if w else []
         frames.append({"index": frame_index(ms, fps), "ms": ms, "vehicles": vehicles})
     return {"source": "data/clear/day.mp4", "fps": fps, "width": width, "height": width * 9 // 16,
             "frame_count": count or frame_index(len(widths) * step_ms, fps), "step_ms": step_ms, "frames": frames}
@@ -31,9 +33,17 @@ def test_near_width_skips_side_edges_and_side_views():
 
 
 def test_choose_keeps_widest_frames_apart():
-    frames = [{"index": i, "width": w} for i, w in [(0, 300), (5, 500), (9, 400), (20, 350)]]
+    frames = [{"index": i, "width": w, "box": [100 * i, 0, w, w]} for i, w in [(0, 300), (5, 500), (9, 400), (20, 350)]]
     assert [f["index"] for f in choose(frames, gap_frames=10, max_frames=5)] == [5, 20]
     assert [f["index"] for f in choose(frames, gap_frames=4, max_frames=2)] == [5, 9]
+
+
+def test_choose_skips_the_same_view():
+    # a car standing still in a jam: the same box seconds later is the same plate again
+    frames = [{"index": 0, "width": 500, "box": [700, 500, 500, 400]},
+              {"index": 30, "width": 490, "box": [705, 502, 490, 395]},
+              {"index": 60, "width": 300, "box": [300, 520, 300, 250]}]
+    assert [f["index"] for f in choose(frames, gap_frames=10, max_frames=5)] == [0, 60]
 
 
 def test_pick_finds_the_window_with_most_near_vehicles():
