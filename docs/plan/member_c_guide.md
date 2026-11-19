@@ -1,19 +1,21 @@
 # Member C Guide · Plate Recognition + Evaluation
 
-DriveInsight · Team 16 Black Box · first version Nov 8, 2026 · **updated Nov 16, 2026**
+DriveInsight · Team 16 Black Box · first version Nov 8, 2026 · **updated Nov 19, 2026**
 
 [한국어](member_c_guide.ko.md) · [Team plan](team_plan.md) · [Feature spec](feature_spec.md)
 
 C finds and reads vehicles and plates (`src/plate/`) and combines the three conditions' results into a comparison (`src/eval/`).
 
-## Status (11/16)
+## Status (11/19)
 
 | | |
 | --- | --- |
-| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26 |
+| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72 |
+| **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips: manifest → frames → label drafts → fixed and adaptive → OCR on three conditions → evaluation, aggregation, comparison, slide images, B's package and videos, with no errors. OCR takes about 1.2–1.6 s per 1080p frame |
+| **Data** | No clips in the repo yet. The AI Hub fog data (630, Hazy) is real fog, but every plate is masked (checked 11/19), so it can't be used for OCR. OCR needs own clear-day dashcam clips with synthetic fog |
 | **Ready to hand over** | `detect_plates` (D), `run_ocr` → `orig.csv` as soon as frames exist (B, D), `eval_ocr` (B), `summary.csv` and `compare.csv` once results exist (all) |
-| **Waiting for** | Original frames and label schema (B), fixed frames (A), adaptive frames (B), VLM scores and `timing.csv` (D) |
-| **Next** | Labeling once the schema arrives; run OCR → eval → aggregate → compare on real frames |
+| **Waiting for** | Own clear-day clips and their labels (C), D's runner (#38) and `timing.csv`, VLM scores (D) |
+| **Next** | Clips → synthetic fog → labels → run the rehearsal steps on them; review D's labels and fact-check D's clips once they exist |
 
 ## Schedule
 
@@ -21,7 +23,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 
 **Weekend (11/7–11/8)**
 
-- [ ] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01) — no public fog footage with readable plates; synthetic fog on clear-day clips with `tools/synth_fog.py` (#61), snow not synthesized
+- [ ] Upload 2–3 fog/snow clips with source, license and 3–5 timestamps; at least half with a visible plate (ALL-01) — no public fog footage with readable plates; synthetic fog on clear-day clips with `tools/synth_fog.py` (#61), snow not synthesized. The AI Hub fog data has masked plates (11/19)
 - [x] Commit stubs: `detect_plates(frame) -> []`, `eval_ocr`, `aggregate` (#2)
 - [x] Install detectors and OCR, test 10 Korean plate photos, write the selection memo (C-01, #4, #8)
 
@@ -29,7 +31,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 
 - [x] 11/9–11/10 Vehicle detection `detect_vehicles` (C-02, #10)
 - [ ] 11/9–11/14 Label own clips with B's schema (ALL-02) — schema ready; drafts and check images with `tools/label_draft.py` (#54)
-- [ ] 11/10 Integration Check 1: the runner calls the stubs end to end
+- [ ] 11/10 Integration Check 1: the runner calls the stubs end to end — C's side ran end to end in the 11/19 rehearsal; D's runner (#38) is not merged yet
 - [x] 11/10–11/12 Plate candidates `detect_plate_candidates` (C-03, #10)
 - [x] 11/12–11/14 Own crop preprocessing `preprocess_plate` (C-04, #12)
 - [x] 11/14–11/16 OCR and status `recognize`, `judge` (C-05, C-06, #12)
@@ -39,9 +41,9 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 
 **Week 2 (11/17–11/24): evaluation and aggregation**
 
-- [ ] 11/17 Integration Check 2: OCR on fixed frames, settle label disagreements (agenda below)
+- [ ] 11/17 Integration Check 2: OCR on fixed frames, settle label disagreements (agenda below) — OCR on fixed frames ran in the rehearsal; labels still to come
 - [x] 11/17–11/19 OCR evaluation `eval_ocr`, callable from B's sensitivity script (C-09, #16)
-- [ ] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08)
+- [ ] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08) — ran in the rehearsal; real frames pending
 - [ ] 11/20–11/22 VLM fact check of D's clips (ALL-04)
 - [x] Aggregation `aggregate`, comparison `compare` with fake CSVs (C-10, C-11, #24, #26)
 - [ ] 11/22–11/24 Rerun aggregation and comparison on real results, after the final VLM scores
@@ -85,6 +87,8 @@ python tools/label_draft.py draft              # ALL-02: box drafts in scenes.js
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
 python tools/compare_images.py                 # C-11: plate and frame images for slides (--hide 2)
 ```
+
+US plates: list their frames in `data/plate_countries.json`, e.g. `{"us": ["bdd_*"]}` ([plate_recognition.md](../plate_recognition.md#us-plates)).
 
 `<samples>` has `full/`, `crops/` and `labels.csv` (`file,text`). Keep sample photos outside the repo.
 
@@ -149,13 +153,14 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 | Part | Pretrained | Own implementation |
 | --- | --- | --- |
 | Vehicle detection | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, box conversion and ordering |
-| Plate detection | – | Candidate search: vertical edges, brightness, center-surround scores with integral images, box growing, NMS |
+| Plate detection | – | Candidate search: vertical edges, brightness, center-surround scores with integral images, box growing, NMS, 4 candidates per vehicle |
 | Crop preprocessing | – | Gray conversion, bilinear resize, contrast stretch, polarity, deskew, Otsu |
-| OCR | PaddleOCR 3.7.0, `korean` PP-OCRv5 models, Apache-2.0 | Line joining, O/I fix, text normalization |
-| Status | – | readable / uncertain / unreadable rules, `?` marking |
-| Evaluation | – | Matching, detection rate, exact match, char accuracy, overconfident count, aggregation, comparison |
+| OCR | PaddleOCR 3.7.0, `korean` PP-OCRv5 models (they also read Latin letters, used for US plates), Apache-2.0 | Line joining, O/I fix, text normalization; for US plates only the plate number line |
+| Status | – | readable / uncertain / unreadable rules: Korean plate format with use characters and regions, `?` marking; US standard format |
+| Evaluation | – | Matching, detection rate, exact match, char accuracy, overconfident count, aggregation, comparison, slide images |
+| Synthetic fog (tool for making clips, not part of the pipeline) | YOLOv8n-seg, Ultralytics 8.4.208, COCO weights, AGPL-3.0: vehicle masks | Fog model (Koschmieder transmission, flat-road distance, vehicle mask distance), forward-scatter blur with A's Gaussian, sensor noise |
 
-Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR downloads to `~/.paddlex/official_models/`.
+Weights: YOLO downloads to `weights/` on first run (ignored by git), YOLOv8n-seg too (a manual download link is in [synthetic_fog.md](../synthetic_fog.md)); PaddleOCR downloads to `~/.paddlex/official_models/`.
 
 ## Open items for Integration Check 2 (11/17)
 
@@ -173,10 +178,11 @@ Weights: YOLO downloads to `weights/` on first run (ignored by git); PaddleOCR d
 | Situation | When known | Plan | Outcome |
 | --- | --- | --- | --- |
 | OCR reads 3 or fewer of 10 | 11/8–11/9, C-01 | Try another OCR; if still bad, focus on char accuracy | Did not happen: PaddleOCR 7/10 (EasyOCR 3/10 was dropped) |
-| Plate detector misses Korean plates | 11/10–11/12, C-03 | Own edge and ratio search in vehicle boxes; else labeled boxes + OCR only | Own search used: plate in top 3 for 10/10 |
+| Plate detector misses Korean plates | 11/10–11/12, C-03 | Own edge and ratio search in vehicle boxes; else labeled boxes + OCR only | Own search used: plate in top 3 for 10/10. In the foggy rehearsal a headlight and grille outscored the plate (4th), so 4 are kept (#72) |
 | Dashcam plates too small | 11/17 on shrunk photos, then original results | Pick timestamps with bigger plates, ask B to add them | Measured ([plate_size_check.md](../plate_size_check.md)): read well from 80 px wide, Hangul lost below that, nothing below 40 px. Guideline: plates ≥ 80 px in 1920×1080. Real frames still to check |
 | Install or GPU problems | 11/8 | CPU and small (n) models | CPU works. On one PC: `pandas==2.2.3`, `chardet==5.2.0` (Windows Application Control), `enable_mkldnn=False` (PaddlePaddle 3.3 CPU), antivirus HTTPS scanning needs the OS cert store |
-| Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Happening: no schema in the repo; eval, aggregation and comparison done with fake files (#16, #24, #26) |
+| Labels late | 11/16 | Finish `eval_ocr` with fake labels, rerun numbers later | Schema and tools exist now (B's `tools/b_labels.py`, label drafts #55); eval, aggregation and comparison done with fake files (#16, #24, #26). Labels wait for clips |
+| No public fog footage with readable plates | 11/18–11/19 | Synthetic fog on own clear-day clips (#62); check AI Hub | AI Hub fog (630, Hazy): real fog, plates masked (11/19). Synthetic fog for OCR. AI Hub's policy forbids letting unapproved people view the data and needs an agreement to take it abroad |
 
 ## Final checklist before submission
 
@@ -189,6 +195,6 @@ When all of these hold before 11/25, C's part is done.
 - [x] `eval_ocr` matches 3 hand-computed cases (#16)
 - [x] Better + worse + unchanged = compared frames in the comparison (#26, tests)
 - [x] Model name, version, weight source and license of the detector and OCR in the selection memo
-- [ ] "Pretrained vs own" table given to D for the README — table ready above
+- [ ] "Pretrained vs own" table given to D for the README — table ready above (updated 11/19)
 - [ ] README explains how weights are downloaded — automatic in code; README is D's
 - [ ] 3 better and 3 worse crop images for the slides — worse ones from `worse_cases.csv`, better ones by hand, once real results exist
