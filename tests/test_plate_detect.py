@@ -116,12 +116,14 @@ def test_own_car():
     assert own_car((3, 681, 1735, 382), 1920, 1080)  # a dashboard box from an own clip
     assert not own_car((500, 681, 900, 382), 1920, 1080)  # not wide enough
     assert not own_car((3, 400, 1735, 400), 1920, 1080)  # wide, but ends above the bottom band
+    assert own_car((928, 824, 192, 74), 1920, 1080)  # a car reflected on the dashboard
+    assert not own_car((700, 690, 300, 260), 1920, 1080)  # a near car: starts above the bottom quarter
 
 
 def test_detect_vehicles_drops_the_camera_car(monkeypatch):
     import src.plate.detect as detect
 
-    model = FakeYolo([[3, 681, 1738, 1063], [700, 500, 1000, 760]])  # dashboard, car ahead
+    model = FakeYolo([[3, 681, 1738, 1063], [700, 500, 1000, 760], [928, 824, 1120, 898]])  # dashboard, car, reflection
     monkeypatch.setattr(detect, "_vehicle_model", lambda: model)
     assert [v["bbox"] for v in detect_vehicles(np.zeros((1080, 1920, 3), np.uint8))] == [(700, 500, 300, 260)]
 
