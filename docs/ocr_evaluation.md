@@ -22,6 +22,10 @@ B's label tool writes this format: `python -m tools.b_labels export` turns the f
 }
 ```
 
+US plates (frames listed in `data/plate_countries.json`, see
+[US plates](plate_recognition.md#us-plates)) are written in upper-case letters and digits, without
+spaces or dashes, e.g. `"7ABC123"`.
+
 ## Matching
 
 Per frame, predicted and labeled plates are paired one-to-one. A pair qualifies when the boxes
@@ -55,6 +59,8 @@ Labels that are not standard plates are left out of the rates too. A standard pl
 judge can call readable ([status rules](plate_recognition.md)): plate characters only, with an optional
 region name. Carmaker advertising plates (123케4567, 12차3456), military and diplomatic plates are
 real, but a read of them can never be right, so they would always count as wrong.
+A label is checked against the standard format of its frame's country: on a US frame, a
+letters-only vanity plate (`GOBEARS`) is not standard, and a US plate on a Korean frame never is.
 
 | Metric | Definition |
 | --- | --- |
