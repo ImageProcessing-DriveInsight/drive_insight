@@ -9,7 +9,7 @@ Crop → `preprocess_plate` (own) → `recognize` (PaddleOCR) → `judge` (own r
 `detect_plates(frame, cond=None, frame_id=None)` gives one result per vehicle:
 
 1. `detect_vehicles` (YOLOv8n), largest first
-2. `detect_plate_candidates` for that vehicle (top 3)
+2. `detect_plate_candidates` for that vehicle (top 4, see [Four candidates](#four-candidates-71))
 3. Each candidate with a 10% border: preprocess → OCR → judge, in order, stopping at the first readable one
 4. Keep the best read (status, then conf) and save its crop to `results/ocr/crops/<cond>/<frame_id>_<n>.png`
 
@@ -33,6 +33,29 @@ A frame with no plate still gets one row, so the CSVs of all conditions list the
 
 On the 10 real photos: the labeled plate was readable and exact in 7/10, the other 3 were uncertain, and no wrong read was readable. About 1.6 s per frame on CPU.
 3 of the 10 turned out to be carmaker advertising plates (케, 차), which no real car carries. Since the plate character check (#34) they are uncertain: 5 of the 7 real plates are readable and exact, 2 uncertain, none wrong.
+
+### Four candidates (#71)
+
+Up to 4 candidates per vehicle are read (3 before #71). In a 1080p rehearsal on synthetic fog, a
+headlight and two grille areas of a white car scored above its plate. The plate was the 4th
+candidate in the foggy original frames and was never read, while in the fixed and adaptive frames
+it was 2nd or 3rd. The original frames then counted as missed, so the detection gain of
+enhancement came from the candidate cutoff, not from reading.
+
+| Check | 3 candidates | 4 candidates |
+| --- | --- | --- |
+| Rehearsal, foggy original frames of that car: plate found | 0/4 | 4/4 (uncertain) |
+| Rehearsal `orig`, 8 labeled plates: detection rate / char accuracy | 0.5 / 0.50 | 1.0 / 0.89 |
+| Plate size frame test, 354 reads: reads that changed | | 0 |
+| Plate size frame test: mean time per frame | 1.31 s | 1.55 s |
+
+The 4th candidate is read only when none of the first 3 is readable, so the extra time goes to
+vehicles whose plate is not readable. The 3-candidate run shared the CPU with other runs part of
+the time, so the real difference may be a little larger. Across the 10 real photos and the
+rehearsal frames the plate was never below 4th.
+
+A shape filter was tried first: dropping grown boxes less than 1.5 times as wide as tall removed
+the square box on the headlight, but a 1.51:1 box on the same headlight took its place.
 
 ## Preprocessing (C-04)
 
