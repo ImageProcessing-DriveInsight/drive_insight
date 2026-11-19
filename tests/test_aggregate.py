@@ -125,3 +125,25 @@ def test_needs_condition_column(tmp_path):
     write_csv(tmp_path / "timing.csv", ["frame", "cond", "total_ms"], [["x.png", "orig", 5]])
     with pytest.raises(ValueError, match="condition"):
         aggregate(tmp_path)
+
+
+def test_stage_logs_time_conditions_without_a_timing_file(tmp_path):
+    """No timing file for orig and fixed: ocr_ms once per frame from ocr/<cond>.csv, enhance_ms from
+    params/<cond>.json. orig (1500 + 900) / 2 = 1200, no enhancement; fixed ocr (1000 + 1400) / 2 = 1200,
+    enhance (150 + 170) / 2 = 160. adaptive has a timing file, so its logs are not read."""
+    write_csv(tmp_path / "ocr" / "orig.csv", PLATE_HEADER,
+              [["a.png", 0, 10, 10, 100, 30, "c.png", "12가3456", 0.95, "readable", 1500],
+               ["a.png", 1, 300, 10, 80, 24, "d.png", "", 0.2, "unreadable", 1500],
+               ["b.png", "", "", "", "", "", "", "", "", "", 900]])
+    write_csv(tmp_path / "ocr" / "fixed.csv", PLATE_HEADER,
+              [["a.png", "", "", "", "", "", "", "", "", "", 1000], ["b.png", "", "", "", "", "", "", "", "", "", 1400]])
+    write_csv(tmp_path / "ocr" / "adaptive.csv", PLATE_HEADER, [["a.png", "", "", "", "", "", "", "", "", "", 5000]])
+    (tmp_path / "params").mkdir()
+    (tmp_path / "params" / "fixed.json").write_text(
+        '{"a.png": {"params": {}, "enhance_ms": 150}, "b.png": {"params": {}, "enhance_ms": 170}}', encoding="utf-8")
+    write_csv(tmp_path / "adaptive" / "timing.csv", ["frame", "enhance_ms", "ocr_ms", "total_ms"], [["a.png", 7, 8, 15]])
+    aggregate(tmp_path)
+    s = read_summary(tmp_path)
+    assert (s["orig"]["ocr_ms"], s["orig"]["enhance_ms"], s["orig"]["total_ms"]) == ("1200.0", "", "")
+    assert (s["fixed"]["ocr_ms"], s["fixed"]["enhance_ms"]) == ("1200.0", "160.0")
+    assert (s["adaptive"]["ocr_ms"], s["adaptive"]["total_ms"]) == ("8.0", "15.0")
