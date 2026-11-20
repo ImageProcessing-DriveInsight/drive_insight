@@ -13,7 +13,7 @@ C는 차량·번호판을 찾아 읽고(`src/plate/`), 세 조건의 결과를 �
 | **머지 완료** | C-01\~C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. 그 뒤: 번호판 크기 점검 #33, #37, 번호판 글자 검사 #35, 평가 매칭 #53, 라벨 초안 #55, 합성 안개 #62, 발표용 이미지 #64, #74, 조건별 시간 파일 #66, 미국 번호판 #70, 후보 4개 #72 |
 | **확인함** | 11/19 1080p 합성 안개 클립 2개로 리허설, 이어서 첫 실제 실행(#78): 직접 찍은 블랙박스 클립 11개 → 차량 크기로 고른 타임스탬프 48개(#77) → 합성 안개 → 프레임, 맑은 기준 프레임, 라벨 → 고정·적응형 → orig, fixed, adaptive와 맑은 기준(#79) OCR → 평가, 집계, 비교, 발표용 이미지. OCR은 1080p 프레임당 약 1.5–1.8초 |
 | **데이터** | 직접 찍은 맑은 날 클립 11개(1분, 1920×1080, 11/17·11/18)와 그걸로 만든 합성 안개 클립 11개, 프레임 48장, C의 라벨: 번호판 66개 중 readable 13개. 모두 git 밖. AI Hub 안개 데이터(630, Hazy)는 번호판이 모두 가려짐(11/19) |
-| **바로 넘길 수 있음** | `detect_plates`(D), `run_ocr`(B, D), `eval_ocr`(B), 첫 실제 `summary.csv`, `compare.csv`와 발표용 이미지([dashcam_results.ko.md](../dashcam_results.ko.md)), `python tools/plate_report.py` 한 번으로 다시 실행(#81). C의 안개 클립, 프레임, 라벨은 git이 아니라 직접 전달(ALL-03과 VLM은 D, 패키지는 B) |
+| **바로 넘길 수 있음** | `detect_plates`(D), `run_ocr`(B, D), `eval_ocr`(B), 첫 실제 `summary.csv`, `compare.csv`와 발표용 이미지([dashcam_results.ko.md](../dashcam_results.ko.md)), 차량 검출률(#83), `python tools/plate_report.py` 한 번으로 다시 실행(#81). C의 안개 클립, 프레임, 라벨은 git이 아니라 직접 전달(ALL-03과 VLM은 D, 패키지는 B) |
 | **기다리는 것** | D의 C 라벨 검수(ALL-03), D의 실행기(#38)와 `timing.csv`, VLM 점수(D), 다른 팀원의 클립과 라벨 |
 | **다음 할 일** | B에게 블랙박스 프레임에서 적응형 규칙이 하나도 발동하지 않았다는 것(대시보드가 들어간 채로 대비를 잼), A에게 감마 0.75가 안개 번호판을 나쁘게 했다는 것 전달. 바뀌면 다시 실행. D의 라벨과 클립이 나오면 교차 검수와 VLM 사실 검증. VLM 점수 뒤 최종 집계 |
 
@@ -84,6 +84,7 @@ python -m src.plate.run clear                  # #79: 맑은 기준 프레임 �
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (라벨: data/labels)
+python -m src.eval.vehicles                    # C-02: 조건별 차량 검출률 → vehicles.csv (#83)
 python tools/label_draft.py draft              # ALL-02: scenes.json에 박스 초안 + 확인 이미지
 python tools/pick_frames.py scan <clear>       # ALL-01: 차량 박스, 이어서 `pick`으로 구간과 타임스탬프 (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: 맑은 날 영상으로 안개 클립 생성
@@ -147,7 +148,7 @@ OCR의 주된 오류는 가운데 한글을 숫자로 읽거나 빠뜨리는 것
 
 ### C-11 비교 — `src/eval/compare.py`, [docs/comparison.ko.md](../comparison.ko.md)
 
-- `orig` → `fixed`, `fixed` → `adaptive` 두 쌍입니다. 프레임의 평균 문자 정확도가 오르면 개선, 내리면 악화, 같으면 변화 없음입니다. 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 세므로, 세 수의 합은 비교한 프레임 수와 같습니다.
+- `orig` → `fixed`, `fixed` → `adaptive` 두 쌍입니다. 프레임의 평균 문자 정확도가 오르면 개선, 내리면 악화, 같으면 변화 없음입니다. 읽을 수 있는 라벨이 없거나 CSV에 없는 프레임은 따로 세므로, 세 수의 합은 비교한 프레임 수와 같습니다. `sign_p`는 개선·악화 수의 정확 부호 검정입니다(#84). 5 대 0이 0.0625라서, 13프레임 결과는 방향으로 읽습니다.
 - `compare.csv`에는 `summary.csv`에서 계산한 지표 변화량도 들어갑니다. `worse_cases.csv`는 나빠진 번호판마다 두 조건의 크롭 경로를 적고, 많이 떨어진 순서로 정렬합니다. 계획서가 "보정이 항상 좋다고 가정하지 않는다"고 약속했기 때문에, 발표에서 가장 설득력 있는 자료가 됩니다.
 - 손으로 계산한 경우가 `tests/test_compare.py`에 있습니다.
 

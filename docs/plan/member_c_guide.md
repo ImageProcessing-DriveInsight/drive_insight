@@ -13,7 +13,7 @@ C finds and reads vehicles and plates (`src/plate/`) and combines the three cond
 | **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72 |
 | **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.5–1.8 s per 1080p frame |
 | **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19) |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), vehicle detection rate (#83), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
 | **Waiting for** | D's review of C's labels (ALL-03), D's runner (#38) and `timing.csv`, VLM scores (D), other members' clips and labels |
 | **Next** | Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist; final aggregation after the VLM scores |
 
@@ -84,6 +84,7 @@ python -m src.plate.run clear                  # #79: clear reference frames →
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
+python -m src.eval.vehicles                    # C-02: vehicle detection rate per condition → vehicles.csv (#83)
 python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
 python tools/pick_frames.py scan <clear>       # ALL-01: vehicle boxes, then `pick` for the window and timestamps (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
@@ -147,7 +148,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 
 ### C-11 Comparison — `src/eval/compare.py`, [docs/comparison.md](../comparison.md)
 
-- `orig` → `fixed` and `fixed` → `adaptive`. A frame is better if its mean char accuracy goes up, worse if it goes down, unchanged otherwise. Frames without a readable label or missing from a CSV are counted apart, so the three counts add up to the compared frames.
+- `orig` → `fixed` and `fixed` → `adaptive`. A frame is better if its mean char accuracy goes up, worse if it goes down, unchanged otherwise. Frames without a readable label or missing from a CSV are counted apart, so the three counts add up to the compared frames. `sign_p` is the exact sign test on better and worse (#84): 5 to 0 gives 0.0625, so with 13 frames the results show directions.
 - `compare.csv` adds metric changes from `summary.csv`. `worse_cases.csv` lists each plate that got worse with both crop paths, largest drop first. The proposal promised not to assume enhancement always helps, so these are the strongest slides.
 - Hand-computed cases in `tests/test_compare.py`.
 
