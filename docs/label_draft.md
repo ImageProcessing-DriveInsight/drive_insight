@@ -55,6 +55,9 @@ Images go to `data/annotations/check/`, which git ignores because they show real
   The evaluation pairs boxes by the overlap of the smaller box ([OCR evaluation](ocr_evaluation.md)),
   so a few pixels do not change the result.
 - Some draft plates are not plates (mirrors, lights, background). Delete them.
+- Before #88, YOLO could box one vehicle twice, once as car and once as truck (IoU 0.92–1.0). The
+  own labels had 9 such pairs, which were removed in #88. Drafts made since then have one box per
+  vehicle. In an older draft, check that no vehicle has two boxes on top of each other.
 
 ## Sample run
 

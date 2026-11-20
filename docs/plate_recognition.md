@@ -75,6 +75,16 @@ vehicle that close rises above the hood.
 or that starts in the bottom quarter (`own_car`). The synthetic fog masks drop them too: they were
 found in some frames only, so their fog would flicker ([synthetic fog](synthetic_fog.md#watch-out)).
 
+### One box per vehicle (#88)
+
+YOLO suppresses overlapping boxes within one class only. A vehicle it sees as both car and truck
+came out twice, with boxes at IoU 0.92–1.0: 9 of the 231 vehicles in the clear frames of the own
+clips, and 2–3 in each fog condition. Its plate was then searched and read twice, and a frame
+with one of the two boxes counted as a missed vehicle. `detect_vehicles` now keeps the most
+confident of boxes that overlap at IoU > 0.5 (`drop_duplicates`, the threshold YOLO uses within
+one class when predicting). The 9 duplicate vehicle labels drafted from those boxes were removed;
+for each pair, the box the detector now keeps was kept.
+
 ### Vehicle detection rate (#83)
 
 C-02 is checked by the share of labeled vehicles found at IoU ≥ 0.5, matched one to one in each
@@ -90,7 +100,7 @@ python -m src.eval.vehicles [--scenes data/annotations/scenes.json] [--skip-dete
 On the own dashcam frames the vehicle labels were drafted by YOLO on the clear frames and checked
 by eye ([label drafts](label_draft.md)). So the clear rate is 1.0 by construction, and vehicles
 YOLO missed even in the clear frames are not labeled. The fog rates are the share of those
-vehicles still found: 0.52 in fog, 0.12 for vehicles under 100 px wide
+vehicles still found: 0.54 in fog, 0.12 for vehicles under 100 px wide
 ([results](dashcam_results.md#vehicle-detection-rate-83)).
 
 ## Preprocessing (C-04)

@@ -12,6 +12,13 @@ it is the reference, and the fog conditions show how many of those vehicles are 
 1. detect_frames: detect_vehicles on frames/<cond>/*.png -> results/vehicles/<cond>.json,
    {frame: [[x, y, w, h], ...]}
 2. vehicle_rates / write_rates: results/vehicles/*.json + labels -> results/vehicles.csv
+3. compare_vehicles / write_vehicle_compare (#86): orig -> fixed and fixed -> adaptive, vehicle
+   by vehicle. A labeled vehicle is gained (found only in the target), lost (only in the base),
+   both or neither, so gained + lost + both + neither = labeled. sign_p is the sign test (#84) on
+   gained against lost. Vehicles in one frame share its fog, so they are not fully independent:
+   read sign_p as a guide, not an exact level.
+   -> results/vehicle_compare.csv (counts) and results/vehicles/changes.csv (gained and lost
+   vehicles with their boxes; git ignores results/vehicles/)
 
 Usage:
     python -m src.eval.vehicles [--frames data/frames] [--results results]
@@ -19,10 +26,10 @@ Usage:
 """
 
 import argparse
-import csv
 import json
 from pathlib import Path
 
+from .compare import PAIRS, sign_p, write_rows
 from .ocr import iou
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,8 +38,12 @@ RESULTS = ROOT / "results"
 SCENES = ROOT / "data" / "annotations" / "scenes.json"
 CONDITIONS = ("orig", "fixed", "adaptive", "clear")  # clear: reference frames of the synthetic fog (#79)
 MATCH_IOU = 0.5
+NEAR_IOU = 0.1  # a missed vehicle's most overlapping detection below this is another vehicle, not a near miss
 SIZES = (("<100", 0, 100), ("100-199", 100, 200), (">=200", 200, None))  # labeled box width, px
 COLUMNS = ["condition", "size", "frames", "labeled", "found", "rate", "unmatched"]
+CHANGES = ("gained", "lost")
+COMPARE_COLUMNS = ["base", "target", "frames", "labeled", "gained", "lost", "both", "neither", "sign_p"]
+CASE_COLUMNS = ["base", "target", "change", "frame", "size", "x", "y", "w", "h", "base_iou", "target_iou"]
 
 
 def load_vehicles(scenes):
@@ -103,16 +114,85 @@ def rate_rows(cond, detections, labels):
     return rows
 
 
+def load_detections(results_dir):
+    """{condition: {frame: [bbox, ...]}} for every results/vehicles/<cond>.json, in CONDITIONS order."""
+    folder = Path(results_dir) / "vehicles"
+    return {cond: json.loads((folder / f"{cond}.json").read_text(encoding="utf-8"))
+            for cond in CONDITIONS if (folder / f"{cond}.json").exists()}
+
+
 def vehicle_rates(results_dir, scenes):
     """Rows (COLUMNS) for every condition with results/vehicles/<cond>.json, in CONDITIONS order."""
-    results_dir = Path(results_dir)
     labels = load_vehicles(scenes)
-    rows = []
-    for cond in CONDITIONS:
-        path = results_dir / "vehicles" / f"{cond}.json"
-        if path.exists():
-            rows += rate_rows(cond, json.loads(path.read_text(encoding="utf-8")), labels)
-    return rows
+    return [row for cond, dets in load_detections(results_dir).items() for row in rate_rows(cond, dets, labels)]
+
+
+def vehicle_reads(detections, labels):
+    """{frame: [read per labeled vehicle]} for one condition, frames with labels and detections only.
+
+    Read: {"found": bool, "det": box or None, "iou": float}. det is the matched detection, or for a
+    missed vehicle the detection overlapping it most, so a near miss shows; None when that IoU is
+    below NEAR_IOU (an edge of a neighboring vehicle). iou is the IoU of that detection either way.
+    """
+    out = {}
+    for frame in sorted(set(detections) & set(labels)):
+        dets, found = detections[frame], match(detections[frame], labels[frame])
+        reads = []
+        for i, box in enumerate(labels[frame]):
+            j = found.get(i, max(range(len(dets)), key=lambda k: iou(box, dets[k]), default=None))
+            score = iou(box, dets[j]) if j is not None else 0.0
+            reads.append({"found": i in found, "det": dets[j] if score >= NEAR_IOU else None, "iou": score})
+        out[frame] = reads
+    return out
+
+
+def change_of(base, target):
+    """gained, lost, both or neither for one labeled vehicle, from its base and target reads."""
+    if base["found"]:
+        return "both" if target["found"] else "lost"
+    return "gained" if target["found"] else "neither"
+
+
+def compare_vehicles(results_dir, scenes):
+    """Compare orig -> fixed and fixed -> adaptive vehicle by vehicle.
+
+    Returns (table, cases): lists of dicts with COMPARE_COLUMNS and CASE_COLUMNS. Only frames with
+    detections in both conditions count; counts are None for a pair whose boxes are missing.
+    Cases: gained vehicles first, then lost, each widest first.
+    """
+    labels = load_vehicles(scenes)
+    reads = {cond: vehicle_reads(dets, labels) for cond, dets in load_detections(results_dir).items()}
+    table, cases = [], []
+    for base, target in PAIRS:
+        row = dict.fromkeys(COMPARE_COLUMNS)
+        row.update(base=base, target=target)
+        if base in reads and target in reads:
+            frames = sorted(set(reads[base]) & set(reads[target]))
+            counts = dict.fromkeys(["labeled", *CHANGES, "both", "neither"], 0)
+            pair_cases = []
+            for frame in frames:
+                for box, b, t in zip(labels[frame], reads[base][frame], reads[target][frame]):
+                    kind = change_of(b, t)
+                    counts["labeled"] += 1
+                    counts[kind] += 1
+                    if kind in CHANGES:
+                        x, y, w, h = box
+                        pair_cases.append({"base": base, "target": target, "change": kind, "frame": frame,
+                                           "size": size_of(box), "x": x, "y": y, "w": w, "h": h,
+                                           "base_iou": b["iou"], "target_iou": t["iou"]})
+            row.update(counts, frames=len(frames), sign_p=sign_p(counts["gained"], counts["lost"]))
+            cases += sorted(pair_cases, key=lambda c: (CHANGES.index(c["change"]), -c["w"], c["frame"]))
+        table.append(row)
+    return table, cases
+
+
+def write_vehicle_compare(results_dir, scenes):
+    """Write results/vehicle_compare.csv and results/vehicles/changes.csv. Returns both paths."""
+    results_dir = Path(results_dir)
+    table, cases = compare_vehicles(results_dir, scenes)
+    (results_dir / "vehicles").mkdir(parents=True, exist_ok=True)
+    return (write_rows(results_dir / "vehicle_compare.csv", COMPARE_COLUMNS, table),
+            write_rows(results_dir / "vehicles" / "changes.csv", CASE_COLUMNS, cases))
 
 
 def write_rates(results_dir, scenes):
@@ -121,14 +201,7 @@ def write_rates(results_dir, scenes):
     rows = vehicle_rates(results_dir, scenes)
     if not rows:
         raise FileNotFoundError(f"no vehicle detections in {results_dir / 'vehicles'}")
-    out = results_dir / "vehicles.csv"
-    with open(out, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS)
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: "" if r[k] is None else round(r[k], 4) if isinstance(r[k], float) else r[k]
-                             for k in COLUMNS})
-    return out
+    return write_rows(results_dir / "vehicles.csv", COLUMNS, rows)
 
 
 def main():
@@ -143,6 +216,7 @@ def main():
             if any((args.frames / cond).glob("*.png")):
                 print(detect_frames(cond, args.frames / cond, args.results))
     print(write_rates(args.results, args.scenes))
+    print(*write_vehicle_compare(args.results, args.scenes), sep="\n")
 
 
 if __name__ == "__main__":
