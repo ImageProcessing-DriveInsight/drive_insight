@@ -2,7 +2,7 @@ import csv
 
 import pytest
 
-from src.eval.compare import CASE_COLUMNS, TABLE_COLUMNS, compare, write_compare
+from src.eval.compare import CASE_COLUMNS, TABLE_COLUMNS, compare, sign_p, write_compare
 from src.eval.ocr import frame_char_accuracy, plate_details
 
 PLATE_HEADER = ["frame", "plate", "x", "y", "w", "h", "crop_path", "text", "conf", "status", "ocr_ms"]
@@ -63,11 +63,13 @@ def test_hand_case_orig_to_fixed(tmp_path):
     assert (first["base"], first["target"]) == ("orig", "fixed")
     assert [first[k] for k in ("frames", "better", "worse", "unchanged", "no_readable_label", "missing")] == [3, 1, 1, 1, 2, 1]
     assert first["better"] + first["worse"] + first["unchanged"] == first["frames"]
+    assert first["sign_p"] == 1.0  # 1 better, 1 worse
     assert first["delta_exact_match"] == pytest.approx(0.25)
     assert first["delta_total_ms"] == pytest.approx(-115)
     assert first["delta_hallucination_rate"] is None and first["delta_detection_rate"] is None
 
     assert (second["base"], second["target"], second["frames"], second["worse"]) == ("fixed", "adaptive", None, None)
+    assert second["sign_p"] is None
     assert second["delta_exact_match"] == pytest.approx(0.05)
 
     assert len(cases) == 1
@@ -98,9 +100,19 @@ def test_missed_plate_and_mixed_frame(tmp_path):
     first, second = table
     assert first["frames"] is None  # orig.csv missing
     assert [second[k] for k in ("frames", "better", "worse", "unchanged")] == [3, 0, 2, 1]
+    assert second["sign_p"] == 0.5  # 2 * (1/2)^2
     assert [c["frame"] for c in cases] == ["h", "i"]
     h = cases[0]
     assert (h["target_text"], h["target_status"], h["target_crop"], h["target_char_acc"]) == (None, None, None, 0.0)
+
+
+def test_sign_p_by_hand():
+    """Two-sided exact sign test: 2 * P(X <= min(better, worse)), X ~ Binomial(better + worse, 1/2)."""
+    assert sign_p(0, 5) == sign_p(5, 0) == 2 / 32  # 0 better, 5 worse: 0.0625
+    assert sign_p(1, 5) == pytest.approx(2 * (1 + 6) / 64)  # 0.21875
+    assert sign_p(0, 10) == pytest.approx(2 / 1024)
+    assert sign_p(1, 1) == sign_p(0, 1) == 1.0  # capped at 1
+    assert sign_p(0, 0) is None  # all frames unchanged
 
 
 def test_plate_details_match_frame_char_accuracy(tmp_path):
