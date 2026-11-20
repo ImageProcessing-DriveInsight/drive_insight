@@ -3,7 +3,9 @@
 For each pair (orig -> fixed, fixed -> adaptive), a frame is better, worse or unchanged by the
 mean char accuracy of its readable labeled plates (frame_char_accuracy). Frames without a
 readable labeled plate, or missing from either OCR CSV, are counted apart and not compared,
-so better + worse + unchanged = frames.
+so better + worse + unchanged = frames. sign_p is the exact two-sided sign test over the better
+and worse frames (unchanged frames left out, #84): the chance of a split at least this uneven if
+the target were as likely to make a frame better as worse.
 
 Writes, under results_dir:
     compare.csv      one row per pair: frame counts and metric changes from summary.csv
@@ -15,6 +17,7 @@ Usage:
 
 import argparse
 import csv
+from math import comb
 from pathlib import Path
 
 from .ocr import load_labels, plate_details
@@ -23,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAIRS = (("orig", "fixed"), ("fixed", "adaptive"))
 DELTA_METRICS = ["detection_rate", "exact_match", "char_accuracy", "vlm_scene_acc", "hallucination_rate", "total_ms"]
 TABLE_COLUMNS = ["base", "target", "frames", "better", "worse", "unchanged", "no_readable_label", "missing",
-                 *[f"delta_{m}" for m in DELTA_METRICS]]
+                 "sign_p", *[f"delta_{m}" for m in DELTA_METRICS]]
 CASE_COLUMNS = ["base", "target", "frame", "label",
                 "base_text", "base_status", "base_char_acc", "base_crop",
                 "target_text", "target_status", "target_char_acc", "target_crop"]
@@ -46,6 +49,15 @@ def load_summary(path):
 
 def frame_mean(plates):
     return sum(p["char_acc"] for p in plates) / len(plates)
+
+
+def sign_p(better, worse):
+    """Exact two-sided sign test p-value for better vs worse frames; None when both are 0."""
+    n = better + worse
+    if n == 0:
+        return None
+    tail = sum(comb(n, i) for i in range(min(better, worse) + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
 
 
 def compare_pair(base, target, labels):
@@ -98,7 +110,7 @@ def compare(results_dir, labels):
         row.update(base=base, target=target)
         if base in details and target in details:
             counts, worse = compare_pair(details[base], details[target], gold)
-            row.update(counts)
+            row.update(counts, sign_p=sign_p(counts["better"], counts["worse"]))
             worse.sort(key=lambda c: (c[2]["char_acc"] - c[1]["char_acc"], c[0]))
             cases += [{"base": base, "target": target, "frame": frame, "label": pb["label"],
                        "base_text": pb["text"], "base_status": pb["status"], "base_char_acc": pb["char_acc"],
