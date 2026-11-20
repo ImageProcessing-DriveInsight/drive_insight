@@ -8,7 +8,9 @@
 4. Comparison (src.eval.compare)      -> <results>/compare.csv, worse_cases.csv
 5. Slide images (tools/compare_images.py) -> <results>/figures/
 6. Vehicle detection rate (src.eval.vehicles, #83) -> <results>/vehicles.csv, when the
-   vehicle labels (--scenes) exist: YOLO on every condition's frames, matched to the labels
+   vehicle labels (--scenes) exist: YOLO on every condition's frames, matched to the labels.
+   Then the vehicle by vehicle comparison (#86) -> <results>/vehicle_compare.csv and
+   vehicles/changes.csv, and the vehicle lists (#87) -> <results>/figures/vehicles_*.png
 
 --skip-ocr reuses the existing <results>/ocr/<cond>.csv and <results>/vehicles/<cond>.json,
 e.g. after the labels changed.
@@ -29,9 +31,9 @@ sys.path.insert(0, str(ROOT))
 from src.eval.aggregate import aggregate  # noqa: E402
 from src.eval.compare import write_compare  # noqa: E402
 from src.eval.ocr import eval_conditions, write_summary  # noqa: E402
-from src.eval.vehicles import SCENES, detect_frames, write_rates  # noqa: E402
+from src.eval.vehicles import SCENES, detect_frames, write_rates, write_vehicle_compare  # noqa: E402
 from src.plate.run import CONDITIONS, REFERENCE, run_ocr  # noqa: E402
-from tools.compare_images import write_images  # noqa: E402
+from tools.compare_images import write_images, write_vehicle_images  # noqa: E402
 
 FRAMES = ROOT / "data" / "frames"
 RESULTS = ROOT / "results"
@@ -66,7 +68,7 @@ def report(frames_dir=FRAMES, results_dir=RESULTS, labels=LABELS, skip_ocr=False
     """Run the chain. scenes: vehicle labels for step 6 (None skips it); detect: vehicle detector.
 
     Returns {"ocr": [csv paths], "ocr_summary", "summary", "compare", "worse_cases", "figures": [...],
-    "vehicles": vehicles.csv path or None}.
+    "vehicles": vehicles.csv path or None, "vehicle_compare": vehicle_compare.csv path or None}.
     """
     frames_dir, results_dir = Path(frames_dir), Path(results_dir)
     out = {"ocr": []}
@@ -90,10 +92,13 @@ def report(frames_dir=FRAMES, results_dir=RESULTS, labels=LABELS, skip_ocr=False
     found = {r["condition"] for r in rows}
     out["figures"] = (write_images(results_dir, labels, frames_dir, hide=hide)
                       if "orig" in found and found & set(CONDITIONS[1:]) else [])
-    out["vehicles"] = (write_rates(results_dir, scenes)
-                       if scenes is not None and any((results_dir / "vehicles").glob("*.json")) else None)
+    out["vehicles"] = out["vehicle_compare"] = None
+    if scenes is not None and any((results_dir / "vehicles").glob("*.json")):
+        out["vehicles"] = write_rates(results_dir, scenes)
+        out["vehicle_compare"] = write_vehicle_compare(results_dir, scenes)[0]
+        out["figures"] += write_vehicle_images(results_dir, scenes, labels, frames_dir, hide=hide)
     log(f"wrote {out['ocr_summary']}, {out['summary']}, {out['compare']}, {len(out['figures'])} images"
-        + (f", {out['vehicles']}" if out["vehicles"] else ""))
+        + (f", {out['vehicles']}, {out['vehicle_compare']}" if out["vehicles"] else ""))
     return out
 
 
