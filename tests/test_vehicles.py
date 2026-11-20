@@ -83,6 +83,8 @@ def test_vehicle_reads_show_near_misses():
     assert (v1["found"], v1["det"], v1["iou"]) == (False, [30, 0, 50, 40], 0.25)  # near miss: IoU 800 / 3200
     assert (v2["found"], v2["det"], v2["iou"]) == (True, V2, 1.0)
     assert (v3["found"], v3["det"], v3["iou"]) == (False, None, 0.0)  # nothing overlaps V3
+    edge = vehicle_reads({"a.png": [[45, 0, 50, 40]]}, {"a.png": [V1]})["a.png"][0]  # IoU 200 / 3800
+    assert (edge["det"], round(edge["iou"], 3)) == (None, 0.053)  # another vehicle's edge, not a near miss
 
 
 def write_boxes(results, **conds):
