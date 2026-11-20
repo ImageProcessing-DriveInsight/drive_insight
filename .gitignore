@@ -248,3 +248,7 @@ data/clear/
 /results/ocr/
 /results/worse_cases.csv
 /results/videos/
+/results/vehicles/
+
+# Review packages (src.package) copy the frames, crops and plate texts
+/package/
