@@ -38,6 +38,7 @@ RESULTS = ROOT / "results"
 SCENES = ROOT / "data" / "annotations" / "scenes.json"
 CONDITIONS = ("orig", "fixed", "adaptive", "clear")  # clear: reference frames of the synthetic fog (#79)
 MATCH_IOU = 0.5
+NEAR_IOU = 0.1  # a missed vehicle's most overlapping detection below this is another vehicle, not a near miss
 SIZES = (("<100", 0, 100), ("100-199", 100, 200), (">=200", 200, None))  # labeled box width, px
 COLUMNS = ["condition", "size", "frames", "labeled", "found", "rate", "unmatched"]
 CHANGES = ("gained", "lost")
@@ -130,7 +131,8 @@ def vehicle_reads(detections, labels):
     """{frame: [read per labeled vehicle]} for one condition, frames with labels and detections only.
 
     Read: {"found": bool, "det": box or None, "iou": float}. det is the matched detection, or for a
-    missed vehicle the detection overlapping it most (None if none overlaps), so a near miss shows.
+    missed vehicle the detection overlapping it most, so a near miss shows; None when that IoU is
+    below NEAR_IOU (an edge of a neighboring vehicle). iou is the IoU of that detection either way.
     """
     out = {}
     for frame in sorted(set(detections) & set(labels)):
@@ -139,7 +141,7 @@ def vehicle_reads(detections, labels):
         for i, box in enumerate(labels[frame]):
             j = found.get(i, max(range(len(dets)), key=lambda k: iou(box, dets[k]), default=None))
             score = iou(box, dets[j]) if j is not None else 0.0
-            reads.append({"found": i in found, "det": dets[j] if score > 0 else None, "iou": score})
+            reads.append({"found": i in found, "det": dets[j] if score >= NEAR_IOU else None, "iou": score})
         out[frame] = reads
     return out
 

@@ -23,7 +23,7 @@ real resolution shows.
 Vehicle lists (#87), when the vehicle labels (--scenes) and results/vehicles/<cond>.json (#83)
 exist: one row per labeled vehicle, its area in each condition with the labeled box in gray and
 the detection box in green (found, IoU >= 0.5) or red (missed: the detection overlapping it
-most, if any), widest vehicle first.
+most, from IoU 0.1), widest vehicle first.
     vehicles_better.png          vehicles found in fixed or adaptive but not in orig
     vehicles_worse.png           vehicles found in orig but not in fixed or adaptive
     vehicles_better_vs_fixed.png vehicles found in adaptive but not in fixed
@@ -316,7 +316,7 @@ def vehicle_color(read):
 
 
 def vehicle_read_of(read):
-    """found or missed, with the IoU of the matched or most overlapping detection."""
+    """found or missed, with the IoU of the matched or near-miss detection."""
     if read is None:
         return "no clear frame"
     if read["det"] is None:
