@@ -81,6 +81,19 @@ def test_report_stops_before_ocr_on_mismatched_frames(setup):
     assert not (results / "ocr").exists()
 
 
+def test_report_adds_the_vehicle_rate(setup, tmp_path):
+    frames, results, labels = setup
+    scenes = tmp_path / "scenes.json"
+    scenes.write_text(json.dumps({"a.png": {"annotation_status": "complete", "vehicles": [{"bbox": [10, 10, 60, 40]}]},
+                                  "b.png": {"annotation_status": "complete", "vehicles": []}}), encoding="utf-8")
+    out = report(frames, results, labels, ocr=fake_ocr, log=lambda *a: None, scenes=scenes,
+                 detect=lambda img: [{"bbox": (10, 10, 60, 40), "cls": "car", "conf": 0.9}])
+    rows = [r for r in csv.DictReader(open(out["vehicles"], encoding="utf-8")) if r["size"] == "all"]
+    assert [(r["condition"], r["frames"], r["rate"], r["unmatched"]) for r in rows] == [
+        ("orig", "2", "1.0", "1"), ("fixed", "2", "1.0", "1"), ("adaptive", "2", "1.0", "1"), ("clear", "1", "1.0", "0")]
+    assert report(frames, results, labels, skip_ocr=True, log=lambda *a: None)["vehicles"] is None  # no scenes
+
+
 def test_skip_ocr_reuses_the_csvs(setup):
     frames, results, labels = setup
     for cond in ("orig", "fixed"):
