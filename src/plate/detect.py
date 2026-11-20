@@ -18,6 +18,7 @@ VEHICLE_CONF = 0.4
 OWN_CAR_WIDTH = 0.6  # share of the frame width
 OWN_CAR_BOTTOM = 0.95  # share of the frame height, from the top
 OWN_CAR_TOP = 0.75  # share of the frame height: a box starting below this row is on the dashboard
+DUPLICATE_IOU = 0.5  # the threshold YOLO uses within one class when predicting
 CROP_MARGIN = 0.1  # border added around a candidate before OCR and saving
 STATUS_RANK = {"readable": 2, "uncertain": 1, "unreadable": 0}
 
@@ -47,6 +48,20 @@ def own_car(box, width, height):
     return (w >= OWN_CAR_WIDTH * width and y + h >= OWN_CAR_BOTTOM * height) or y >= OWN_CAR_TOP * height
 
 
+def drop_duplicates(vehicles, threshold=DUPLICATE_IOU):
+    """One box per vehicle: of boxes overlapping at IoU > threshold, keep the most confident.
+
+    YOLO suppresses overlapping boxes within one class only, so a vehicle seen as both car and
+    truck came out twice (IoU 0.92-1.0; 9 of 231 vehicles in the clear frames of the own clips,
+    #88), and its plate was searched and read twice.
+    """
+    kept = []
+    for v in sorted(vehicles, key=lambda v: v["conf"], reverse=True):
+        if all(iou(v["bbox"], k["bbox"]) <= threshold for k in kept):
+            kept.append(v)
+    return kept
+
+
 def detect_vehicles(img) -> list[dict]:
     """Detect cars, trucks, buses and motorcycles in one frame, without the camera car itself.
 
@@ -54,8 +69,8 @@ def detect_vehicles(img) -> list[dict]:
         img: np.ndarray, uint8, shape (H, W, 3), BGR.
 
     Returns:
-        List of {"bbox": (x, y, w, h), "cls": str, "conf": float},
-        largest box first (usually the closest vehicle).
+        List of {"bbox": (x, y, w, h), "cls": str, "conf": float}, one per vehicle
+        (see drop_duplicates), largest box first (usually the closest vehicle).
     """
     validate_frame(img)
     r = _vehicle_model().predict(img, conf=VEHICLE_CONF, classes=list(VEHICLE_CLASSES), verbose=False)[0]
@@ -66,7 +81,7 @@ def detect_vehicles(img) -> list[dict]:
         x2, y2 = min(w, round(x2)), min(h, round(y2))
         if x2 > x1 and y2 > y1 and not own_car((x1, y1, x2 - x1, y2 - y1), w, h):
             vehicles.append({"bbox": (x1, y1, x2 - x1, y2 - y1), "cls": VEHICLE_CLASSES[int(c)], "conf": round(float(p), 4)})
-    return sorted(vehicles, key=lambda v: v["bbox"][2] * v["bbox"][3], reverse=True)
+    return sorted(drop_duplicates(vehicles), key=lambda v: v["bbox"][2] * v["bbox"][3], reverse=True)
 
 
 def padded_crop(frame, box, margin=CROP_MARGIN):
