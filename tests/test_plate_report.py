@@ -91,7 +91,28 @@ def test_report_adds_the_vehicle_rate(setup, tmp_path):
     rows = [r for r in csv.DictReader(open(out["vehicles"], encoding="utf-8")) if r["size"] == "all"]
     assert [(r["condition"], r["frames"], r["rate"], r["unmatched"]) for r in rows] == [
         ("orig", "2", "1.0", "1"), ("fixed", "2", "1.0", "1"), ("adaptive", "2", "1.0", "1"), ("clear", "1", "1.0", "0")]
-    assert report(frames, results, labels, skip_ocr=True, log=lambda *a: None)["vehicles"] is None  # no scenes
+    compare = list(csv.DictReader(open(out["vehicle_compare"], encoding="utf-8")))
+    assert [(r["labeled"], r["gained"], r["lost"], r["both"]) for r in compare] == [("1", "0", "0", "1")] * 2
+    assert not any(p.name.startswith("vehicles_") for p in out["figures"])  # no vehicle changed
+    out = report(frames, results, labels, skip_ocr=True, log=lambda *a: None)  # no scenes
+    assert out["vehicles"] is None and out["vehicle_compare"] is None
+
+
+def test_report_compares_vehicles(setup, tmp_path):
+    """fixed/a.png darker: the fake detector misses its vehicle, so fixed loses it and adaptive gains it back."""
+    frames, results, labels = setup
+    save_png(frames / "fixed" / "a.png", np.full((H, W, 3), 150, np.uint8))
+    scenes = tmp_path / "scenes.json"
+    scenes.write_text(json.dumps({"a.png": {"vehicles": [{"bbox": [10, 10, 60, 40]}]}, "b.png": {"vehicles": []}}),
+                      encoding="utf-8")
+    detect = lambda img: [{"bbox": (10, 10, 60, 40), "cls": "car", "conf": 0.9}] if img[0, 0, 0] == 200 else []  # noqa: E731
+    out = report(frames, results, labels, ocr=fake_ocr, log=lambda *a: None, scenes=scenes, detect=detect)
+    compare = list(csv.DictReader(open(out["vehicle_compare"], encoding="utf-8")))
+    assert [(r["base"], r["gained"], r["lost"]) for r in compare] == [("orig", "0", "1"), ("fixed", "1", "0")]
+    names = {p.name for p in out["figures"]}
+    assert {"vehicles_worse.png", "vehicles_better_vs_fixed.png"} <= names and "vehicles_better.png" not in names
+    changes = list(csv.DictReader(open(results / "vehicles" / "changes.csv", encoding="utf-8")))
+    assert [(c["change"], c["frame"]) for c in changes] == [("lost", "a.png"), ("gained", "a.png")]
 
 
 def test_skip_ocr_reuses_the_csvs(setup):
