@@ -75,6 +75,24 @@ vehicle that close rises above the hood.
 or that starts in the bottom quarter (`own_car`). The synthetic fog masks drop them too: they were
 found in some frames only, so their fog would flicker ([synthetic fog](synthetic_fog.md#watch-out)).
 
+### Vehicle detection rate (#83)
+
+C-02 is checked by the share of labeled vehicles found at IoU ≥ 0.5, matched one to one in each
+frame, largest IoU first. `src.eval.vehicles` runs `detect_vehicles` on every condition's frames,
+keeps the boxes in `results/vehicles/<cond>.json`, and writes `results/vehicles.csv` per condition
+and labeled box width (< 100, 100–199, ≥ 200 px). Boxes that match no labeled vehicle are counted
+as `unmatched`. `tools/plate_report.py` runs it when the vehicle labels exist.
+
+```bash
+python -m src.eval.vehicles [--scenes data/annotations/scenes.json] [--skip-detect]
+```
+
+On the own dashcam frames the vehicle labels were drafted by YOLO on the clear frames and checked
+by eye ([label drafts](label_draft.md)). So the clear rate is 1.0 by construction, and vehicles
+YOLO missed even in the clear frames are not labeled. The fog rates are the share of those
+vehicles still found: 0.52 in fog, 0.12 for vehicles under 100 px wide
+([results](dashcam_results.md#vehicle-detection-rate-83)).
+
 ## Preprocessing (C-04)
 
 Own implementation with NumPy:
