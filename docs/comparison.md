@@ -100,6 +100,35 @@ The images show real plates and go to `results/figures/`, which git ignores. For
 `--hide N` to cover the last N characters in the images and texts. It covers only labeled plates,
 by the share of characters across the label box, so check every image by eye before using it.
 
+## Vehicles (#86, #87)
+
+The same comparison for the vehicle labels (`scenes.json`) and the vehicle boxes of the
+[vehicle detection rate](plate_recognition.md#vehicle-detection-rate-83). For each pair, a labeled
+vehicle is `gained` (found only in the target), `lost` (found only in the base), `both` or
+`neither`, so gained + lost + both + neither = labeled. `sign_p` is the same sign test on gained
+against lost. The vehicles of one frame share its fog, so they are not fully independent: read
+`sign_p` as a guide, not an exact level.
+
+```bash
+python -m src.eval.vehicles      # also vehicle_compare.csv and vehicles/changes.csv
+python tools/compare_images.py   # also vehicles_*.png when the vehicle labels and boxes exist
+```
+
+| File | What it has |
+| --- | --- |
+| `results/vehicle_compare.csv` | one row per pair: `frames`, `labeled`, `gained`, `lost`, `both`, `neither`, `sign_p` |
+| `results/vehicles/changes.csv` | one row per gained or lost vehicle: pair, frame, size, box, IoU in the base and the target. In `results/vehicles/`, which git ignores |
+| `vehicles_better.png` | vehicles found in `fixed` or `adaptive` but not in `orig`, widest first |
+| `vehicles_worse.png` | vehicles found in `orig` but missed in `fixed` or `adaptive` |
+| `vehicles_better_vs_fixed.png`, `vehicles_worse_vs_fixed.png` | the same for `adaptive` against `fixed` |
+
+Each vehicle row has the labeled size, then the vehicle area (label box plus 15 % on each side)
+in every condition, `clear` first when its boxes exist. The labeled box is gray. The detection box
+is green when it found the vehicle (IoU ≥ 0.5) and red when it did not: for a missed vehicle it is
+the detection overlapping it most, so a box that is too loose or covers only half the vehicle
+shows. Below IoU 0.1 that detection is the edge of another vehicle and is not drawn. `--hide N` also covers the labeled plates inside the vehicle areas. Plates without a
+readable label are not covered.
+
 ## Checked by hand
 
 `tests/test_compare.py` works out the counts in the docstrings: one better, one worse and one

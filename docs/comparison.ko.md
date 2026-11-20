@@ -98,6 +98,33 @@ python tools/plate_report.py                       # OCR, 평가, 집계, 비교
 `--hide N`으로 이미지와 글자의 마지막 N글자를 가리세요. 라벨 번호판만, 라벨 박스를 글자 수 비율로
 나눠 가리므로 쓰기 전에 이미지를 하나씩 눈으로 확인하세요.
 
+## 차량 (#86, #87)
+
+같은 비교를 차량 라벨(`scenes.json`)과 [차량 검출률](plate_recognition.ko.md#차량-검출률-83)의
+차량 박스로도 합니다. 비교 쌍마다 라벨 차량은 `gained`(뒤 조건에서만 찾음), `lost`(앞 조건에서만
+찾음), `both`, `neither` 중 하나이므로 gained + lost + both + neither = 라벨 차량 수입니다.
+`sign_p`는 gained와 lost에 같은 부호 검정을 한 값입니다. 한 프레임의 차량들은 같은 안개를 받아
+완전히 독립이 아니므로, `sign_p`는 정확한 유의수준이 아니라 참고값으로 읽으세요.
+
+```bash
+python -m src.eval.vehicles      # vehicle_compare.csv, vehicles/changes.csv도 씀
+python tools/compare_images.py   # 차량 라벨과 박스가 있으면 vehicles_*.png도 씀
+```
+
+| 파일 | 내용 |
+| --- | --- |
+| `results/vehicle_compare.csv` | 비교 쌍마다 한 행: `frames`, `labeled`, `gained`, `lost`, `both`, `neither`, `sign_p` |
+| `results/vehicles/changes.csv` | 새로 찾거나 놓친 차량마다 한 행: 비교 쌍, 프레임, 크기, 박스, 앞·뒤 조건의 IoU. git이 무시하는 `results/vehicles/` 안에 있음 |
+| `vehicles_better.png` | `orig`에서는 못 찾고 `fixed`나 `adaptive`에서 찾은 차량, 폭이 큰 순서 |
+| `vehicles_worse.png` | `orig`에서는 찾았지만 `fixed`나 `adaptive`에서 놓친 차량 |
+| `vehicles_better_vs_fixed.png`, `vehicles_worse_vs_fixed.png` | `adaptive`를 `fixed`와 같은 방식으로 비교 |
+
+차량 행마다 라벨 크기, 그다음 조건별 차량 영역(라벨 박스에 각 변 15 % 여유)이 있고, 맑은 프레임
+박스가 있으면 `clear`가 맨 앞입니다. 라벨 박스는 회색입니다. 검출 박스는 차량을 찾았으면(IoU ≥ 0.5)
+초록, 못 찾았으면 빨강입니다. 놓친 차량에는 가장 많이 겹친 검출 박스를 그리므로, 너무 크거나 차의
+절반만 덮은 박스가 보입니다. IoU 0.1 미만이면 다른 차의 가장자리이므로 그리지 않습니다. `--hide N`은 차량 영역 안의 라벨 번호판도 가립니다. 읽을 수 있는
+라벨이 없는 번호판은 가리지 않습니다.
+
 ## 손으로 확인한 경우
 
 `tests/test_compare.py`의 docstring에 계산 과정을 적어 두었습니다. 개선·악화·변화 없음 프레임
