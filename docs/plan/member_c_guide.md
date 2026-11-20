@@ -6,14 +6,14 @@ DriveInsight · Team 16 Black Box · first version Nov 8, 2026 · **updated Nov 
 
 C finds and reads vehicles and plates (`src/plate/`) and combines the three conditions' results into a comparison (`src/eval/`).
 
-## Status (11/19)
+## Status (11/20)
 
 | | |
 | --- | --- |
-| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72 |
-| **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.5–1.8 s per 1080p frame |
+| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72; own dashcam clips and the one-command report #80; vehicle rate and sign test #85 |
+| **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.4–1.6 s per foggy 1080p frame |
 | **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19) |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), vehicle detection rate (#83), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), vehicle detection rate and vehicle by vehicle comparison with slide images (#83, #86, #87), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
 | **Waiting for** | D's review of C's labels (ALL-03), D's runner (#38) and `timing.csv`, VLM scores (D), other members' clips and labels |
 | **Next** | Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist; final aggregation after the VLM scores |
 
@@ -84,11 +84,11 @@ python -m src.plate.run clear                  # #79: clear reference frames →
 python -m src.eval.ocr --labels data/labels    # C-09: results/ocr/<cond>.csv → ocr_summary.csv
 python -m src.eval.aggregate                   # C-10: ocr_summary.csv, vlm/score.csv, timing.csv → summary.csv
 python -m src.eval.compare                     # C-11: compare.csv, worse_cases.csv (labels: data/labels)
-python -m src.eval.vehicles                    # C-02: vehicle detection rate per condition → vehicles.csv (#83)
+python -m src.eval.vehicles                    # C-02: vehicle detection rate per condition → vehicles.csv (#83), vehicle_compare.csv (#86)
 python tools/label_draft.py draft              # ALL-02: box drafts in scenes.json + check images
 python tools/pick_frames.py scan <clear>       # ALL-01: vehicle boxes, then `pick` for the window and timestamps (#77)
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
-python tools/compare_images.py                 # C-11: plate and frame images for slides (--hide 2)
+python tools/compare_images.py                 # C-11: plate, frame and vehicle images for slides (--hide 2)
 python tools/plate_report.py                   # C-08 to C-11 in one run: OCR on every condition, then evaluation to images (#81)
 ```
 
@@ -114,7 +114,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 
 ### C-02, C-03 Detection — `src/plate/detect.py`, `src/plate/candidates.py`
 
-- `detect_vehicles`: car, truck, bus, motorcycle with `conf` ≥ 0.4, bbox `(x, y, w, h)`, largest first.
+- `detect_vehicles`: car, truck, bus, motorcycle with `conf` ≥ 0.4, bbox `(x, y, w, h)`, largest first, one box per vehicle: YOLO gave a vehicle seen as both car and truck two boxes, now the more confident one is kept (#88).
 - `detect_plate_candidates` (own): search below 35% of each vehicle box; score every window by vertical edge density and brightness minus a ring around it (integral images); 8 widths × 3 aspect ratios (2:1, 3:1, 4.5:1); grow the best window while the edge profile stays dense; NMS; top 4 per vehicle (3 until #71).
 - Real photos: plate in the top 3 for 10/10, first for 8/10. The brightness term found a plate next to a busy grille; growing fixed boxes that covered only the middle characters.
 
@@ -151,12 +151,13 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 - `orig` → `fixed` and `fixed` → `adaptive`. A frame is better if its mean char accuracy goes up, worse if it goes down, unchanged otherwise. Frames without a readable label or missing from a CSV are counted apart, so the three counts add up to the compared frames. `sign_p` is the exact sign test on better and worse (#84): 5 to 0 gives 0.0625, so with 13 frames the results show directions.
 - `compare.csv` adds metric changes from `summary.csv`. `worse_cases.csv` lists each plate that got worse with both crop paths, largest drop first. The proposal promised not to assume enhancement always helps, so these are the strongest slides.
 - Hand-computed cases in `tests/test_compare.py`.
+- Vehicles (#86, #87): the same pairs per labeled vehicle, gained, lost, found in both or in neither, with the sign test → `vehicle_compare.csv`, and `vehicles_*.png` for the slides. On the own clips fixed gains 4 vehicles and loses 10 of 222 (p 0.18).
 
 ## Pretrained vs own implementation (for the README)
 
 | Part | Pretrained | Own implementation |
 | --- | --- | --- |
-| Vehicle detection | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, camera car filter (dashboard and reflections), box conversion and ordering |
+| Vehicle detection | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, camera car filter (dashboard and reflections), one box per vehicle across classes, box conversion and ordering |
 | Plate detection | – | Candidate search: vertical edges, brightness, center-surround scores with integral images, box growing, NMS, 4 candidates per vehicle |
 | Crop preprocessing | – | Gray conversion, bilinear resize, contrast stretch, polarity, deskew, Otsu |
 | OCR | PaddleOCR 3.7.0, `korean` PP-OCRv5 models (they also read Latin letters, used for US plates), Apache-2.0 | Line joining, O/I fix, text normalization; for US plates only the plate number line |
@@ -203,4 +204,4 @@ When all of these hold before 11/25, C's part is done.
 - [x] Model name, version, weight source and license of the detector and OCR in the selection memo
 - [ ] "Pretrained vs own" table given to D for the README — table ready above (updated 11/19)
 - [ ] README explains how weights are downloaded — automatic in code; README is D's
-- [ ] 3 better and 3 worse crop images for the slides — on the own clips no plate read better in fixed or adaptive than in orig; `worse.png` (5 plates) and `better_vs_fixed.png` exist (#78)
+- [x] 3 better and 3 worse crop images for the slides — on the own clips no plate read better in fixed or adaptive than in orig, so the better cases are vehicles: `vehicles_better.png` (4 vehicles fixed found and orig missed) and `vehicles_worse.png` (#87); `worse.png` (5 plates) and `better_vs_fixed.png` (#78)
