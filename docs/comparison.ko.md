@@ -23,6 +23,11 @@ python -m src.eval.compare --labels data/labels    # C-11: compare.csv, worse_ca
 
 따라서 `better + worse + unchanged = frames`입니다. VLM 점수는 프레임이 아니라 클립 단위라서 지표 변화에만 나타납니다.
 
+`sign_p`는 `better`와 `worse`에 대한 양측 정확 부호 검정입니다(#84). 대상 조건이 프레임을 좋게 할 확률과
+나쁘게 할 확률이 같다고 할 때, 지금만큼 또는 그보다 한쪽으로 치우친 결과가 나올 확률입니다. 변화 없는 프레임은
+빼고, 움직인 프레임이 없으면 빈 값입니다. 프레임이 적으면 값이 큽니다. 5 대 0이 0.0625이고, 0.05 아래로
+내려가는 가장 작은 경우는 6 대 0입니다.
+
 ## `compare.csv`
 
 비교 쌍마다 한 행입니다.
@@ -32,6 +37,7 @@ python -m src.eval.compare --labels data/labels    # C-11: compare.csv, worse_ca
 | `base`, `target` | `orig` → `fixed`, `fixed` → `adaptive` |
 | `frames`, `better`, `worse`, `unchanged` | 비교한 프레임 수와 그 분류 |
 | `no_readable_label`, `missing` | 비교에서 뺀 프레임 수 |
+| `sign_p` | `better`와 `worse`에 대한 양측 정확 부호 검정(#84) |
 | `delta_detection_rate`, `delta_exact_match`, `delta_char_accuracy` | 대상 − 기준, `summary.csv`에서 계산 |
 | `delta_vlm_scene_acc`, `delta_hallucination_rate`, `delta_total_ms` | 대상 − 기준, `summary.csv`에서 계산 |
 

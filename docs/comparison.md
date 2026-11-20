@@ -23,6 +23,11 @@ A frame's score is the mean char accuracy of its readable labeled plates, the sa
 
 So `better + worse + unchanged = frames`. VLM scores are per clip, not per frame, so they appear only in the metric changes.
 
+`sign_p` is the exact two-sided sign test on `better` and `worse` (#84): the chance of a split at
+least this uneven if the target made a frame better or worse with equal odds. Unchanged frames are
+left out, and it is empty when no frame moved. With few frames it stays high: 5 to 0 gives 0.0625,
+and the smallest split below 0.05 is 6 to 0.
+
 ## `compare.csv`
 
 One row per pair.
@@ -32,6 +37,7 @@ One row per pair.
 | `base`, `target` | `orig` → `fixed`, `fixed` → `adaptive` |
 | `frames`, `better`, `worse`, `unchanged` | compared frames and their split |
 | `no_readable_label`, `missing` | frames left out |
+| `sign_p` | exact two-sided sign test on `better` and `worse` (#84) |
 | `delta_detection_rate`, `delta_exact_match`, `delta_char_accuracy` | target − base, from `summary.csv` |
 | `delta_vlm_scene_acc`, `delta_hallucination_rate`, `delta_total_ms` | target − base, from `summary.csv` |
 
