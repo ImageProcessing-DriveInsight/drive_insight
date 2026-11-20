@@ -16,10 +16,10 @@ Only numbers are here. Clips, frames, labels, crops, slide images and plate text
 | Fixed | A's `python -m src.dip.batch`, default parameters |
 | Adaptive | B's `python -m tools.b_cli frames` with A's `apply_ops` |
 | Clear | the clear frames the fog was made from (`python -m src.plate.run clear`, #79) |
-| Labels | C, from zoomed crops: text spelled on the clear frame, status judged on the foggy frame (`readable` only if every character can be read there). 66 plates: 13 readable (10 different plates; one car is in 3 frames), 53 unreadable. Plates narrower than about 40 px and plates hidden behind other cars are not labeled. One plate whose Hangul could not be settled at its closest clear view is labeled unreadable. Not reviewed by D yet (ALL-03) |
+| Labels | C, from zoomed crops: text spelled on the clear frame, status judged on the foggy frame (`readable` only if every character can be read there). 66 plates: 13 readable (10 different plates; one car is in 3 frames), 53 unreadable. Plates narrower than about 40 px and plates hidden behind other cars are not labeled. One plate whose Hangul could not be settled at its closest clear view is labeled unreadable. Vehicles: 231, drafted by YOLO on the clear frames and checked by eye. Not reviewed by D yet (ALL-03) |
 
 ```bash
-python tools/plate_report.py    # OCR on every condition, evaluation, aggregation, comparison, slide images (#81)
+python tools/plate_report.py    # OCR on every condition, evaluation, aggregation, comparison, slide images (#81), vehicle rate (#83)
 ```
 
 ## Results
@@ -48,7 +48,31 @@ By fog density, char accuracy (exact reads):
 
 `compare.csv`: of the 13 frames with a readable label (35 have none), `orig → fixed` has 0 better,
 5 worse and 8 unchanged; `fixed → adaptive` has 5 better, 0 worse and 8 unchanged.
-`worse_cases.csv` lists the 5 plates fixed made worse.
+Both splits have a sign test p of 0.0625 (`sign_p`, #84): with only 5 frames moving, even 5 to 0
+stays above 0.05, so the direction is consistent but not proven. `worse_cases.csv` lists the 5
+plates fixed made worse.
+
+## Vehicle detection rate (#83)
+
+231 labeled vehicles in the 48 frames, matched at IoU ≥ 0.5 (`results/vehicles.csv`). The labels
+were drafted by YOLO on the clear frames, so clear is 1.00 by construction
+([note](plate_recognition.md#vehicle-detection-rate-83)).
+
+| Labeled width | vehicles | clear | orig (fog) | fixed | adaptive |
+| --- | --- | --- | --- | --- | --- |
+| All | 231 | 1.00 | 0.52 (120) | 0.49 (113) | 0.52 (120) |
+| < 100 px | 65 | 1.00 | 0.12 (8) | 0.11 (7) | 0.12 (8) |
+| 100–199 px | 85 | 1.00 | 0.51 (43) | 0.47 (40) | 0.51 (43) |
+| ≥ 200 px | 81 | 1.00 | 0.85 (69) | 0.81 (66) | 0.85 (69) |
+
+By fog density, orig (found / labeled):
+
+| | all | < 100 px | 100–199 px | ≥ 200 px |
+| --- | --- | --- | --- | --- |
+| `medium` (150 m) | 0.60 (68/113) | 0.26 (8/31) | 0.58 (21/36) | 0.85 (39/46) |
+| `heavy` (75 m) | 0.44 (52/118) | 0.00 (0/34) | 0.45 (22/49) | 0.86 (30/35) |
+
+Boxes that match no labeled vehicle: 8 in orig and adaptive, 6 in fixed, none in clear.
 
 ## What this shows
 
@@ -59,13 +83,15 @@ By fog density, char accuracy (exact reads):
    wide dashcam lens puts a car's plate below that unless it is a few meters ahead. On development
    frames outside the evaluation windows, reading the raw crop or a 3× cubic enlargement instead of
    C's preprocessing did not bring the Hangul back either. No plate was read confidently wrong.
-2. **Fog costs the far vehicles.** Plate results fall from 222 in the clear frames to 125 in the
-   foggy ones (`medium` −34 %, `heavy` −53 %): YOLO no longer finds the far vehicles. Of the 53
-   plates labeled unreadable, 35 got a box in the clear frames and 28 in fog. The label rule keeps
-   these plates out of the rates, so the rates do not show this loss; the counts do.
+2. **Fog costs the far vehicles.** YOLO finds 0.52 of the labeled vehicles in fog: 0.85 of those
+   at least 200 px wide but 0.12 of those under 100 px, and none of the 34 small ones in `heavy`
+   fog. Plate results fall from 222 in the clear frames to 125 in the foggy ones (`medium` −34 %,
+   `heavy` −53 %). Of the 53 plates labeled unreadable, 35 got a box in the clear frames and 28 in
+   fog. The label rule keeps these plates out of the plate rates, so those do not show this loss;
+   the vehicle rate and the counts do.
 3. **Fixed enhancement hurts in fog.** Char accuracy drops from 0.81 to 0.70 (`heavy` 0.74 → 0.53):
-   5 frames worse, none better, one plate turned `unreadable`, 7 fewer vehicles, 8 fewer boxes on
-   unreadable labels. Gamma 0.75 brightens frames that fog has already made bright (brightness median 154), so
+   5 frames worse, none better (sign test p 0.0625), one plate turned `unreadable`, vehicle rate
+   0.52 → 0.49 (7 vehicles), 8 fewer boxes on unreadable labels. Gamma 0.75 brightens frames that fog has already made bright (brightness median 154), so
    the plates lose contrast (`results/figures/worse.png`).
 4. **Adaptive did nothing.** No rule fired on any of the 48 frames, so the adaptive frames equal
    the originals pixel for pixel. B's whole-frame contrast was 48–73 (median 60), above the
@@ -87,6 +113,8 @@ By fog density, char accuracy (exact reads):
 - The fog is synthetic. A vehicle gets the fog of the distance where it meets the road, so near
   plates get little fog: at 10 m, `medium` keeps 0.77 and `heavy` 0.59 of the light.
 - One labeler (C); D's review (ALL-03) is still to come.
+- The vehicle labels come from YOLO on the clear frames, so vehicles it missed there are not
+  counted: the fog vehicle rates are relative to the clear frames, not to every vehicle on the road.
 - The fog clips were made before cars reflected on the dashboard were dropped from the vehicle
   masks (#78); those masks only touch the dashboard. OCR ran after the change.
 - The first OCR frame of each run includes loading the models (about 6.5 s), which raises the mean

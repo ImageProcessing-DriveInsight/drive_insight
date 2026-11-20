@@ -73,6 +73,22 @@
 박스를 뺍니다(`own_car`). 합성 안개의 차량 마스크에서도 뺍니다. 일부 프레임에서만 잡혀서 그 부분의 안개가
 깜박이기 때문입니다([합성 안개](synthetic_fog.ko.md#주의할-점)).
 
+### 차량 검출률 (#83)
+
+C-02는 라벨 차량을 IoU ≥ 0.5로 찾은 비율로 확인합니다. 프레임마다 IoU가 큰 쌍부터 일대일로 맞춥니다.
+`src.eval.vehicles`가 조건마다 모든 프레임에 `detect_vehicles`를 돌려 박스를 `results/vehicles/<cond>.json`에
+남기고, 조건과 라벨 박스 폭(100 px 미만, 100–199, 200 이상)별로 `results/vehicles.csv`를 씁니다. 라벨 차량과
+맞지 않은 박스는 `unmatched`로 셉니다. `tools/plate_report.py`는 차량 라벨이 있으면 이 단계도 돌립니다.
+
+```bash
+python -m src.eval.vehicles [--scenes data/annotations/scenes.json] [--skip-detect]
+```
+
+직접 찍은 프레임의 차량 라벨은 맑은 프레임의 YOLO 결과로 초안을 만들고 눈으로 확인했습니다
+([라벨 초안](label_draft.ko.md)). 그래서 맑은 프레임의 검출률은 만들 때부터 1.0이고, 맑은 프레임에서도 YOLO가
+놓친 차는 라벨에 없습니다. 안개 조건의 검출률은 그 차들 중 아직 찾는 비율입니다. 안개에서 0.52, 폭 100 px
+미만 차량은 0.12입니다([결과](dashcam_results.ko.md#차량-검출률-83)).
+
 ## 전처리 (C-04)
 
 NumPy로 직접 구현했습니다.
