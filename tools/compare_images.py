@@ -20,13 +20,22 @@ The plate area is cut from each condition's frame at the label box, so every col
 same place, also where OCR missed the plate. Small plates are enlarged without smoothing, so the
 real resolution shows.
 
+Vehicle lists (#87), when the vehicle labels (--scenes) and results/vehicles/<cond>.json (#83)
+exist: one row per labeled vehicle, its area in each condition with the labeled box in gray and
+the detection box in green (found, IoU >= 0.5) or red (missed: the detection overlapping it
+most, if any), widest vehicle first.
+    vehicles_better.png          vehicles found in fixed or adaptive but not in orig
+    vehicles_worse.png           vehicles found in orig but not in fixed or adaptive
+    vehicles_better_vs_fixed.png vehicles found in adaptive but not in fixed
+    vehicles_worse_vs_fixed.png  vehicles found in fixed but not in adaptive
+
 Images show real plates. They go to results/figures/, which git ignores. --hide N covers the last
 N characters of every labeled plate, in the images and the texts. Other plates in the frame
-images are not covered.
+images and the vehicle lists are not covered.
 
 Usage:
     python tools/compare_images.py [--results DIR] [--labels PATH] [--frames-dir DIR] [--out DIR]
-                                   [--top N] [--hide N] [--frames FRAME ...]
+                                   [--top N] [--hide N] [--frames FRAME ...] [--scenes PATH]
 """
 
 import argparse
@@ -39,6 +48,7 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src.eval.ocr import frame_key, load_labels, plate_details  # noqa: E402
+from src.eval.vehicles import SCENES, load_detections, load_vehicles, vehicle_reads  # noqa: E402
 from src.plate.imgutil import load_png  # noqa: E402
 from tools.label_draft import font  # noqa: E402
 
@@ -52,6 +62,9 @@ PLATE_H = 80  # px, plate area height in the lists
 CELL_W = 5 * PLATE_H  # px, widest plate area in the lists
 LABEL_W = 260  # px, label column
 PANEL_W = 640  # px, width of each condition in the frame images
+VEHICLE_H = 140  # px, vehicle area height in the vehicle lists
+VEHICLE_W = 2 * VEHICLE_H  # px, widest vehicle area in the vehicle lists
+VEHICLE_MARGIN = 0.15  # share of the label box added on each side, so a loose detection box shows
 PAD = 12
 EPS = 1e-9
 WHITE, INK, FAINT = (255, 255, 255), (20, 20, 20), (120, 120, 120)
@@ -156,11 +169,17 @@ def cover(image, bbox, label, n):
     return image
 
 
+def area_of(shape, bbox, margin=MARGIN):
+    """(x0, y0, x1, y1): the box plus margin on each side, clipped to an image of this shape."""
+    x, y, w, h = bbox
+    mx, my = round(w * margin), round(h * margin)
+    return max(0, x - mx), max(0, y - my), min(shape[1], x + w + mx), min(shape[0], y + h + my)
+
+
 def plate_area(image, bbox):
     """The label box plus MARGIN on each side, clipped to the image."""
-    x, y, w, h = bbox
-    mx, my = round(w * MARGIN), round(h * MARGIN)
-    return image[max(0, y - my):min(image.shape[0], y + h + my), max(0, x - mx):min(image.shape[1], x + w + mx)]
+    x0, y0, x1, y1 = area_of(image.shape, bbox)
+    return image[y0:y1, x0:x1]
 
 
 def fit(area, height=PLATE_H, width=CELL_W):
@@ -260,6 +279,110 @@ def write_images(results=RESULTS, labels=LABELS, frames_dir=FRAMES, out=None, to
     return paths
 
 
+def vehicle_rows(results=RESULTS, scenes=SCENES):
+    """(conditions found, rows): one row per labeled vehicle in a frame with boxes in every found condition.
+
+    Row: {"frame", "bbox", "reads": {condition: vehicle_reads entry}}. With vehicles/clear.json the
+    conditions start with clear, and reads["clear"] is None for a frame without a clear frame.
+    """
+    labels = load_vehicles(scenes)
+    reads = {cond: vehicle_reads(dets, labels) for cond, dets in load_detections(results).items()}
+    found = [c for c in CONDS if c in reads]
+    rows = []
+    for frame in reads[found[0]] if found else []:
+        if all(frame in reads[c] for c in found):
+            for i, box in enumerate(labels[frame]):
+                row = {c: reads[c][frame][i] for c in found}
+                if REFERENCE in reads:
+                    row = {REFERENCE: reads[REFERENCE][frame][i] if frame in reads[REFERENCE] else None, **row}
+                rows.append({"frame": frame_key(frame), "bbox": tuple(box), "reads": row})
+    return ([REFERENCE] if REFERENCE in reads else []) + found, rows
+
+
+def vehicle_pick(rows, top, base="orig"):
+    """(better, worse) against base: vehicles found in a later condition but not in base, and found
+    in base but missed in a later one. At most top each, widest first."""
+    def later_found(row):
+        return [row["reads"][c]["found"] for c in later(row["reads"], base)]
+
+    better = [r for r in rows if not r["reads"][base]["found"] and any(later_found(r))]
+    worse = [r for r in rows if r["reads"][base]["found"] and not all(later_found(r))]
+    key = lambda r: (-r["bbox"][2], r["frame"])  # noqa: E731
+    return sorted(better, key=key)[:top], sorted(worse, key=key)[:top]
+
+
+def vehicle_color(read):
+    return FAINT if read is None else GOOD if read["found"] else BAD
+
+
+def vehicle_read_of(read):
+    """found or missed, with the IoU of the matched or most overlapping detection."""
+    if read is None:
+        return "no clear frame"
+    if read["det"] is None:
+        return "missed"
+    return f"{'found' if read['found'] else 'missed'}  IoU {read['iou']:.2f}"
+
+
+def vehicle_cell(image, bbox, read):
+    """The vehicle area, its labeled box in gray and the detection box in the read's color."""
+    x0, y0, x1, y1 = area_of(image.shape, bbox, VEHICLE_MARGIN)
+    cell = fit(image[y0:y1, x0:x1], VEHICLE_H, VEHICLE_W)
+    scale = cell.width / max(1, x1 - x0)
+    d = ImageDraw.Draw(cell)
+    for box, ink, width in ((bbox, FAINT, 2), (read and read["det"], vehicle_color(read), 3)):
+        if box:
+            x, y, w, h = box
+            d.rectangle([(x - x0) * scale, (y - y0) * scale, (x + w - x0) * scale - 1, (y + h - y0) * scale - 1],
+                        outline=ink, width=width)
+    return cell
+
+
+def vehicle_list(rows, conds, frames_dir=FRAMES, plates=None, hide=0):
+    """One image for the vehicle rows: header, then size and vehicle area per condition."""
+    big, small = font(26), font(18)
+    row_h = PAD + VEHICLE_H + 30 + PAD
+    sheet = Image.new("RGB", (LABEL_W + len(conds) * (VEHICLE_W + PAD) + PAD, 48 + len(rows) * row_h), WHITE)
+    d = ImageDraw.Draw(sheet)
+    d.text((PAD, 10), "vehicle", fill=INK, font=big)
+    for j, cond in enumerate(conds):
+        d.text((LABEL_W + j * (VEHICLE_W + PAD), 10), cond, fill=INK, font=big)
+    for i, row in enumerate(rows):
+        top = 48 + i * row_h
+        d.line([(0, top), (sheet.width, top)], fill=(220, 220, 220), width=1)
+        d.text((PAD, top + PAD + 20), f"{row['bbox'][2]} x {row['bbox'][3]} px", fill=INK, font=big)
+        d.text((PAD, top + PAD + 56), row["frame"], fill=FAINT, font=small)
+        for j, cond in enumerate(conds):
+            left, read = LABEL_W + j * (VEHICLE_W + PAD), row["reads"][cond]
+            image = load_frame(frames_dir, cond, row["frame"])
+            if image is None:
+                d.text((left, top + PAD + 20), "no frame", fill=FAINT, font=small)
+            else:
+                for plate in (plates or {}).get(row["frame"], []):
+                    cover(image, plate["bbox"], plate["text"], hide)
+                sheet.paste(vehicle_cell(image, row["bbox"], read), (left, top + PAD))
+            d.text((left, top + PAD + VEHICLE_H + 4), vehicle_read_of(read), fill=vehicle_color(read), font=small)
+    return sheet
+
+
+def write_vehicle_images(results=RESULTS, scenes=SCENES, labels=LABELS, frames_dir=FRAMES, out=None, top=6, hide=0):
+    """Write the vehicle lists that have vehicles (see the module docstring). Returns the written
+    paths: none without boxes for orig and a later condition. labels are read only for --hide."""
+    out = Path(out) if out else Path(results) / "figures"
+    conds, rows = vehicle_rows(results, scenes)
+    plates = load_labels(labels) if hide > 0 else {}
+    paths = []
+    for base, suffix in (("orig", ""), ("fixed", "_vs_fixed")):
+        if base not in conds or not later(conds, base):
+            continue
+        for name, chosen in zip(("better", "worse"), vehicle_pick(rows, top, base)):
+            if chosen:
+                out.mkdir(parents=True, exist_ok=True)
+                paths.append(out / f"vehicles_{name}{suffix}.png")
+                vehicle_list(chosen, conds, frames_dir, plates, hide).save(paths[-1])
+    return paths
+
+
 def main():
     ap = argparse.ArgumentParser(description="Comparison images of plates and frames across conditions.")
     ap.add_argument("--results", type=Path, default=RESULTS, help="folder with ocr/<cond>.csv")
@@ -269,8 +392,12 @@ def main():
     ap.add_argument("--top", type=int, default=6, help="plates per list")
     ap.add_argument("--hide", type=int, default=0, help="cover the last N characters of every labeled plate")
     ap.add_argument("--frames", nargs="+", help="frame images for these frames instead of the listed ones")
+    ap.add_argument("--scenes", type=Path, default=SCENES, help="vehicle labels; no vehicle lists without them")
     args = ap.parse_args()
     paths = write_images(args.results, args.labels, args.frames_dir, args.out, args.top, args.hide, args.frames)
+    if args.scenes.exists():
+        paths += write_vehicle_images(args.results, args.scenes, args.labels, args.frames_dir, args.out, args.top,
+                                      args.hide)
     print("\n".join(str(p) for p in paths) if paths else "no plate changed between conditions")
 
 
