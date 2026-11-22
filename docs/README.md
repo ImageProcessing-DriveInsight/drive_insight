@@ -29,5 +29,6 @@
 | ALL-01: synthetic fog clips from clear-day clips | [synthetic_fog.md](synthetic_fog.md) | [synthetic_fog.ko.md](synthetic_fog.ko.md) |
 | ALL-01: picking evaluation timestamps by vehicle size | [frame_pick.md](frame_pick.md) | [frame_pick.ko.md](frame_pick.ko.md) |
 | Results on own dashcam clips: clear, fog, fixed, adaptive (#78) | [dashcam_results.md](dashcam_results.md) | [dashcam_results.ko.md](dashcam_results.ko.md) |
+| Vehicle detection rate on AI Hub vehicle labels (#90) | [aihub_vehicles.md](aihub_vehicles.md) | [aihub_vehicles.ko.md](aihub_vehicles.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.
