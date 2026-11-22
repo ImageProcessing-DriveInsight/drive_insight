@@ -29,5 +29,6 @@
 | ALL-01: 맑은 날 영상으로 만드는 합성 안개 클립 | [synthetic_fog.md](synthetic_fog.md) | [synthetic_fog.ko.md](synthetic_fog.ko.md) |
 | ALL-01: 차량 크기로 평가 타임스탬프 고르기 | [frame_pick.md](frame_pick.md) | [frame_pick.ko.md](frame_pick.ko.md) |
 | 직접 찍은 블랙박스 클립 결과: 맑음, 안개, 고정, 적응형 (#78) | [dashcam_results.md](dashcam_results.md) | [dashcam_results.ko.md](dashcam_results.ko.md) |
+| AI Hub 차량 라벨로 차량 검출률 재기 (#90) | [aihub_vehicles.md](aihub_vehicles.md) | [aihub_vehicles.ko.md](aihub_vehicles.ko.md) |
 
 계획 문서는 2026-11-16 기준 저장소 상태를 반영합니다.
