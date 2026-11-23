@@ -252,3 +252,6 @@ data/clear/
 
 # Review packages (src.package) copy the frames, crops and plate texts
 /package/
+
+# Per environment condition reports (tools/env_report.py) copy plate texts and crops (#92)
+/results/by_env/
