@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -21,28 +22,30 @@ DEFAULT_ROOT = "team_data/A_night/71588_night_highway_front"
 
 def _index(folder, suffixes, issues):
     indexed = {}
-    parent_links = {}
-    for path in sorted(folder.rglob("*")):
-        if path.suffix.lower() not in suffixes:
-            continue
-        relative = path.relative_to(folder)
-        parents = []
-        for parent in path.parents:
-            if parent == folder.parent:
-                break
-            if parent not in parent_links:
-                parent_links[parent] = parent.is_symlink()
-            parents.append(parent_links[parent])
-        if path.is_symlink() or any(parents):
-            issues.append({"path": relative.as_posix(), "message": "Symlink input is not supported"})
-            continue
-        if not path.is_file():
-            continue
-        key = relative.with_suffix("").as_posix().casefold()
-        if key in indexed:
-            issues.append({"path": relative.as_posix(), "message": "Duplicate image/label stem"})
-        else:
-            indexed[key] = path
+    pending = [folder]
+    if folder.is_symlink():
+        issues.append({"path": folder.name, "message": "Symlink input is not supported"})
+        return indexed
+    while pending:
+        current = pending.pop()
+        try:
+            with os.scandir(current) as stream:
+                entries = sorted(stream, key=lambda entry: entry.name)
+            for entry in entries:
+                path = Path(entry.path)
+                relative = path.relative_to(folder)
+                if entry.is_symlink():
+                    issues.append({"path": relative.as_posix(), "message": "Symlink input is not supported"})
+                elif entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                elif path.suffix.lower() in suffixes and entry.is_file(follow_symlinks=False):
+                    key = relative.with_suffix("").as_posix().casefold()
+                    if key in indexed:
+                        issues.append({"path": relative.as_posix(), "message": "Duplicate image/label stem"})
+                    else:
+                        indexed[key] = path
+        except OSError as exc:
+            issues.append({"path": current.relative_to(folder).as_posix(), "message": str(exc)})
     return indexed
 
 
@@ -74,6 +77,8 @@ def audit_dataset(root=DEFAULT_ROOT, *, decode_images=False, workers=1):
         try:
             raw = label_path.read_bytes()
             label = json.loads(raw.decode("utf-8-sig"))
+            if not isinstance(label, dict):
+                raise ValueError("Label must be a JSON object")
             if image_name(label, label_path) != image.name:
                 raise ValueError("Label image filename does not match the source")
             _, objs, size = objects(label, label_path)
