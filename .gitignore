@@ -228,3 +228,10 @@ results/ocr/crops/
 
 # Local DIP development notes
 /docs/dip.md
+
+# Local dataset and generated experiment results
+data/
+results/
+
+# Local VLM test images
+test_images/
