@@ -11,6 +11,9 @@ python tools/aihub_vehicles.py <라벨 폴더> [<라벨 폴더> ...] [--out data
 python -m src.eval.vehicles --frames <프레임 폴더> --scenes data/annotations/aihub_vehicles.json
 ```
 
+직접 찍은 프레임과 함께 평가할 때는 라벨 파일을 같이 줍니다:
+`--scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` ([#92](env_report.ko.md)).
+
 ## 라벨 형식
 
 | 형식 | 데이터 | 차량으로 세는 클래스 |

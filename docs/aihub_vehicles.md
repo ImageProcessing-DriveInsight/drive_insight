@@ -12,6 +12,9 @@ python tools/aihub_vehicles.py <labels dir> [<labels dir> ...] [--out data/annot
 python -m src.eval.vehicles --frames <frames dir> --scenes data/annotations/aihub_vehicles.json
 ```
 
+To evaluate together with own frames, give both label files:
+`--scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` ([#92](env_report.md)).
+
 ## Label formats
 
 | Format | Data | Classes counted as vehicles |
