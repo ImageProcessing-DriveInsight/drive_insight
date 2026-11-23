@@ -71,3 +71,10 @@ def test_cli_report_refuses_overwrite_and_source_output(tmp_path):
 def test_missing_root(tmp_path):
     with pytest.raises(ValueError, match="Missing dataset"):
         audit_dataset(tmp_path)
+
+
+def test_serial_and_parallel_reports_are_identical(tmp_path):
+    root = dataset(tmp_path, group=True)
+    assert audit_dataset(root, decode_images=True, workers=1) == audit_dataset(root, decode_images=True, workers=4)
+    with pytest.raises(ValueError, match="workers"):
+        audit_dataset(root, workers=0)

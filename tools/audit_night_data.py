@@ -2,6 +2,7 @@
 
 import argparse
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import math
@@ -45,12 +46,14 @@ def _index(folder, suffixes, issues):
     return indexed
 
 
-def audit_dataset(root=DEFAULT_ROOT, *, decode_images=False):
+def audit_dataset(root=DEFAULT_ROOT, *, decode_images=False, workers=1):
     """Pair by relative stem; report C-compatible boxes without choosing evaluation data.
 
     Width >=100 counts only in complete (non-group) frames. This is an audit count,
     not approval of scene eligibility, brightness aggregation or sampling rules.
     """
+    if type(workers) is not int or not 1 <= workers <= 8:
+        raise ValueError("workers must be an integer from 1 to 8")
     root = resolve(root).resolve()
     issues, frames = [], []
     for name in ("images", "labels"):
@@ -60,13 +63,13 @@ def audit_dataset(root=DEFAULT_ROOT, *, decode_images=False):
     labels = _index(root / "labels", {".json"}, issues)
     if not images:
         issues.append({"path": "images", "message": "No image files"})
-    for key in sorted(set(images) | set(labels)):
+    def inspect_pair(key):
         image, label_path = images.get(key), labels.get(key)
         if image is None or label_path is None:
             existing = image or label_path
             issues.append({"path": existing.relative_to(root).as_posix(),
                            "message": "Missing matching label" if label_path is None else "Missing matching image"})
-            continue
+            return
         relative = image.relative_to(root / "images")
         try:
             raw = label_path.read_bytes()
@@ -93,6 +96,15 @@ def audit_dataset(root=DEFAULT_ROOT, *, decode_images=False):
                                and any(v["bbox"][2] >= 100 for v in entry["vehicles"])})
         except (OSError, ValueError, TypeError, KeyError, IndexError, OverflowError) as exc:
             issues.append({"path": relative.as_posix(), "message": str(exc)})
+    keys = sorted(set(images) | set(labels))
+    if workers == 1:
+        for key in keys:
+            inspect_pair(key)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            list(pool.map(inspect_pair, keys))
+    frames.sort(key=lambda frame: frame["source"])
+    issues.sort(key=lambda issue: (issue["path"], issue["message"]))
     scenes = Counter(f["scene"] for f in frames)
     return {"schema_version": 1, "decode_images": decode_images,
             "selection_status": "not_selected", "capture_timing": "unknown",
@@ -106,6 +118,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=DEFAULT_ROOT)
     parser.add_argument("--decode-images", action="store_true", help="Also decode every source locally and check dimensions")
+    parser.add_argument("--workers", type=int, default=4, help="Read-only image/label workers, 1..8 (default 4)")
     parser.add_argument("--output", default="data/annotations/a_night_audit.json")
     args = parser.parse_args(argv)
     output = resolve(args.output).resolve()
@@ -113,7 +126,7 @@ def main(argv=None):
     if output == root or output.is_relative_to(root):
         parser.error("Audit output must be outside the source dataset")
     try:
-        report = audit_dataset(root, decode_images=args.decode_images)
+        report = audit_dataset(root, decode_images=args.decode_images, workers=args.workers)
         if output.exists():
             raise FileExistsError("Audit output exists; choose a new report path")
         output.parent.mkdir(parents=True, exist_ok=True)
