@@ -148,7 +148,7 @@ Development only, starting 11/7. Original frames are shared on 11/8, fixed frame
 | 3.6 | `detect_plates`, original frame results | C | 11/16 | `results/ocr/orig.csv` | 3.5 | Done (#14, #78): 48 own dashcam frames |
 | 3.7 | OCR evaluation (detection, exact match, char accuracy) | C | 11/17–11/19 | `eval/ocr.py` | 3.6 | Done (#16) |
 | 3.8 | Run on fixed and adaptive frames | C | 11/19–11/20 | `fixed.csv`, `adaptive.csv` | 3.7, 1.9, 2.7 | Done (#78, #79): the same 48 frames, plus the clear reference |
-| 3.9 | Aggregation (OCR, VLM, time), comparison, better/worse counts | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | Code done (#24, #26); run on own frames (#78, #81), vehicle rate and comparison (#83, #86); final run after D's VLM scores |
+| 3.9 | Aggregation (OCR, VLM, time), comparison, better/worse counts | C | 11/20–11/24 | `eval/aggregate.py`, `summary.csv` | 3.8, 4.8 | Code done (#24, #26); run on own frames (#78, #81), vehicle rate and comparison (#83, #86), AI Hub vehicle labels (#90), results per environment condition (#92); final run after D's VLM scores |
 | **4** | **Experiment runner + VLM + environment** | **D** | **11/7–11/28** |  |  |  |
 | 4.1 | Common utils (frame load/save, logger, timer), `main.py` skeleton | D | 11/7–11/8 | `src/common/`, `main.py` | – | — |
 | 4.2 | `run_experiment` (frame list check, config snapshot) | D | 11/8–11/11 | `pipeline/run.py` | 4.1 | — |

@@ -6,16 +6,16 @@ DriveInsight · Team 16 Black Box · first version Nov 8, 2026 · **updated Nov 
 
 C finds and reads vehicles and plates (`src/plate/`) and combines the three conditions' results into a comparison (`src/eval/`).
 
-## Status (11/20)
+## Status (11/23)
 
 | | |
 | --- | --- |
-| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72; own dashcam clips and the one-command report #80; vehicle rate and sign test #85 |
+| **Merged** | C-01 to C-11: #2, #4, #8, #10, #12, #14, #16, #24, #26. Since then: plate size check #33, #37; plate characters #35; evaluation matching #53; label drafts #55; synthetic fog #62; slide images #64, #74; per-condition timing #66; US plates #70; four plate candidates #72; own dashcam clips and the one-command report #80; vehicle rate and sign test #85; vehicle by vehicle comparison and one box per vehicle #89; AI Hub vehicle label conversion #91; results per environment condition and several vehicle label files #93 |
 | **Checked** | 11/19 rehearsal on two 1080p synthetic fog clips, then the first real run (#78): 11 own dashcam clips → 48 timestamps picked by vehicle size (#77) → synthetic fog → frames, clear references, labels → fixed and adaptive → OCR on orig, fixed, adaptive and the clear reference (#79) → evaluation, aggregation, comparison, slide images. OCR takes about 1.4–1.6 s per foggy 1080p frame |
-| **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19) |
-| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), vehicle detection rate and vehicle by vehicle comparison with slide images (#83, #86, #87), rerun in one command with `python tools/plate_report.py` (#81); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
-| **Waiting for** | D's review of C's labels (ALL-03), D's runner (#38) and `timing.csv`, VLM scores (D), other members' clips and labels |
-| **Next** | Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist; final aggregation after the VLM scores |
+| **Data** | 11 own clear-day clips (1 min, 1920×1080, 11/17 and 11/18) and 11 synthetic fog clips made from them, 48 frames, C's labels: 66 plates, 13 readable. All outside git. The AI Hub fog data (630, Hazy) has every plate masked (11/19). The AI Hub night, rain and tunnel data also has masked plates and no plate labels, so it cannot be used for OCR, but its vehicle region labels are the ground truth of the vehicle detection rate (#90): vehicles evaluated 21,287 in 71588 night, 5,640 in 630 rain, 1,813 in 71570, 759 in 71930 tunnel |
+| **Ready to hand over** | `detect_plates` (D), `run_ocr` (B, D), `eval_ocr` (B), first real `summary.csv`, `compare.csv` and slide images ([dashcam_results.md](../dashcam_results.md)), vehicle detection rate and vehicle by vehicle comparison with slide images (#83, #86, #87), rerun in one command with `python tools/plate_report.py` (#81), AI Hub vehicle label conversion `tools/aihub_vehicles.py` (#90), results per environment condition `tools/env_report.py` (#92); C's fog clips, frames and labels by hand, not through git (D for ALL-03 and the VLM, B for the package) |
+| **Waiting for** | Each condition owner's evaluation list (11/23), B's original frames and AI Hub name mapping, A's and B's enhanced frames (morning of 11/24), labels of the own frames, D's VLM scores (11/23) and runner (#38), D's review of C's labels (ALL-03) |
+| **Next** | When the frames arrive, run `tools/plate_report.py` (vehicle labels: both `scenes.json` and the AI Hub conversion), then `tools/env_report.py` (`--envs` for AI Hub frames) for results per condition. Fix them at integration check 3 on 11/24 and rerun after the VLM scores for the final aggregation. Tell B that no adaptive rule fired on dashcam frames (contrast measured with the dashboard in the frame) and A that gamma 0.75 hurt plates in fog; rerun when they change; review D's labels and fact-check D's clips once they exist |
 
 ## Schedule
 
@@ -46,7 +46,7 @@ Development and data work in one list. IDs from the feature spec in brackets. Da
 - [x] 11/19–11/20 Run fixed and adaptive frames: `fixed.csv`, `adaptive.csv` (C-08) — on the 48 own frames, plus `clear.csv` (#78, #79)
 - [ ] 11/20–11/22 VLM fact check of D's clips (ALL-04)
 - [x] Aggregation `aggregate`, comparison `compare` with fake CSVs (C-10, C-11, #24, #26)
-- [ ] 11/22–11/24 Rerun aggregation and comparison on real results, after the final VLM scores
+- [ ] 11/22–11/24 Rerun aggregation and comparison on real results, after the final VLM scores — results per condition with `tools/env_report.py` (#92) at the same time
 - [ ] 11/24 Integration Check 3: results for three conditions fixed
 
 **Last week (11/25–11/28)**
@@ -90,7 +90,11 @@ python tools/pick_frames.py scan <clear>       # ALL-01: vehicle boxes, then `pi
 python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear-day clip
 python tools/compare_images.py                 # C-11: plate, frame and vehicle images for slides (--hide 2)
 python tools/plate_report.py                   # C-08 to C-11 in one run: OCR on every condition, then evaluation to images (#81)
+python tools/aihub_vehicles.py <labels> ...    # #90: AI Hub vehicle labels → data/annotations/aihub_vehicles.json
+python tools/env_report.py                     # #92: plate_report results per environment condition → results/by_env/
 ```
+
+With several vehicle label files, give them together to `--scenes`, e.g. `--scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json`.
 
 US plates: list their frames in `data/plate_countries.json`, e.g. `{"us": ["bdd_*"]}` ([plate_recognition.md](../plate_recognition.md#us-plates)).
 
@@ -115,6 +119,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 ### C-02, C-03 Detection — `src/plate/detect.py`, `src/plate/candidates.py`
 
 - `detect_vehicles`: car, truck, bus, motorcycle with `conf` ≥ 0.4, bbox `(x, y, w, h)`, largest first, one box per vehicle: YOLO gave a vehicle seen as both car and truck two boxes, now the more confident one is kept (#88).
+- Ground truth of the vehicle detection rate: B's `scenes.json` for own frames, and for AI Hub frames a file of boxes made from the vehicle polygons (`tools/aihub_vehicles.py`, #90, [notes](../aihub_vehicles.md)). Frames with a group label (cargroup and similar) are left out. Both files go to `--scenes` together; a frame in both stops the run (#92).
 - `detect_plate_candidates` (own): search below 35% of each vehicle box; score every window by vertical edge density and brightness minus a ring around it (integral images); 8 widths × 3 aspect ratios (2:1, 3:1, 4.5:1); grow the best window while the edge profile stays dense; NMS; top 4 per vehicle (3 until #71).
 - Real photos: plate in the top 3 for 10/10, first for 8/10. The brightness term found a plate next to a busy grille; growing fixed boxes that covered only the middle characters.
 
@@ -144,6 +149,7 @@ Main OCR error: the middle Hangul read as a digit or dropped. The plate format c
 
 - `summary.csv`: one row per condition with plates, detection rate, exact match, char accuracy, overconfident, readable_wrong, VLM scene accuracy, hallucination rate, uncheckable claims, mean ms per step.
 - VLM counts are pooled over clips when `score.csv` has them, else the row rates are averaged. A missing file leaves its columns empty, so it runs before all results exist.
+- Per environment condition (#92, [notes](../env_report.md)): `tools/env_report.py` splits the `plate_report` results by the condition in `eval_set.csv` (or an `--envs` CSV) and reruns evaluation, aggregation and comparison per condition without new OCR or detection. Plate labels are split too, so plates of another condition are not counted as missed. The combined tables are `results/by_env/summary.csv` and so on, with an `env` column first. On the 48 own fog frames (one condition) they matched the pooled tables in every value.
 - Hand-computed cases in `tests/test_aggregate.py`.
 
 ### C-11 Comparison — `src/eval/compare.py`, [docs/comparison.md](../comparison.md)
