@@ -6,10 +6,8 @@ A는 야간 목록 선정과 고정 보정 결과를 담당한다. 원본 PNG �
 차량 라벨 변환·검출·OCR·집계는 C, VLM은 D 담당이다. 이 문서는 그 인터페이스를
 준비하며 B/C의 평가기를 변경하지 않는다.
 
-최종 선정 전 C에게 확인할 사항은 난수 생성기 초기화·추출 순서·평가/튜닝 분할,
-밝기 산출 방식, 장면당 균등 6장 추출 시 반올림 방식이다. 답변 전에는 후보를 확정하거나
-평가 목록을 생성하지 않는다. 기존 clips.csv의 추천값(폭 150, 밝기 20)을 새 공통 기준으로
-대체해 자동 선정하지 않는다. 공유된 후보 수 41/137도 검증 전 기대값으로만 취급한다.
+2026-11-23 C 답변으로 아래 선정 규칙이 확정됐다(#98). 기존 clips.csv의 추천값
+(폭 150, 밝기 20)은 사용하지 않는다. 후보 수 41/137을 재현하지 못하면 멈추고 확인한다.
 
 ## 데이터 보관
 
@@ -51,3 +49,48 @@ python -m tools.audit_night_data --decode-images \
 합성 이미지·라벨로 원본 불변, 한글 경로, 누락 쌍·이름 불일치·손상 입력,
 묶음 라벨·차량 폭 경계, 출력 덮어쓰기 방지를 검사한다.
 실제 자료의 상세 결과는 로컬 보고서로 보관하며 공개 PR에는 집계값만 기록한다.
+
+## C가 확정한 야간 선정 규칙 (#98)
+
+```bash
+python -m tools.select_night_frames
+```
+
+도구는 원본·라벨 대응을 다시 검사하고, C와 같은 차량 판정을 적용한다.
+장면 6장 이상, complete이면서 폭 100px 이상인 차량이 있는 프레임 수 ×2가
+장면 전체 프레임 수 이상이어야 후보이다. 묶음 라벨이 있는 프레임은 분자에서만 빠진다.
+밝기는 clips.csv의 mean_gray(기존 요약 방식)를 그대로 쓰며 다시 계산하지 않는다.
+5 이상 일반, 미만 어려운 후보다. 41/137이 아니면 목록을 쓰지 않는다.
+
+- 각각 문자열 이름순으로 정렬한 뒤 `random.Random(2026).sample(normal, 5)`와
+  `random.Random(2026).sample(hard, 2)`를 **새 생성기 두 개**로 수행한다.
+- 추출 순서를 유지해 일반 앞 4개·어려운 첫 1개는 evaluation,
+  일반 마지막 1개·어려운 마지막 1개는 tuning이다. 장면 중복은 없다.
+- 프레임은 파일명 끝 숫자순으로 정렬하고 `round(i*(n-1)/5)` (i=0..5)로 뽑는다.
+  20장이면 0,4,8,11,15,19번째다. 뽑힌 묶음 라벨·차량 없는 프레임도 바꾸지 않는다.
+  후보 여부와 프레임 선택은 서로 다른 단계다. 영상·보정·OCR 결과를 보고 다시 고르지 않는다.
+
+기본 출력은 Git 제외된 `data/manifests/a_night/`다.
+
+- `evaluation_frames.csv`(30행), `tuning_frames.csv`(12행):
+  `split,condition,scene,difficulty,source,frame,tags,sequence_index,mean_gray`
+- `evaluation_names.csv`, `tuning_names.csv`: C의 변환기에 맞춘 `source,frame` 두 열.
+- `COMPLETE.json`: 규칙, 후보 수, 추출 순서, CSV·clips.csv·선정 원본/라벨 SHA-256.
+  이 파일을 마지막에 쓴다. 없으면 불완전한 출력으로 취급한다.
+
+## A → B 전달 형식: 이번 구현에서 정한 사항
+
+이 파일들은 **A의 전달 목록**이다. B의 기존 video/timestamp 기반 eval_set.csv를
+교체하거나 확장하지 않는다. source는 `--root` 기준 `images/Clip_xxx/원본.jpg` 상대경로,
+frame은 원본 stem+.png다. C의 변환기는 source의 basename을 사용하므로 호환된다.
+출력 frame 이름은 evaluation/tuning 전체에서 대소문자 구분 없이 유일해야 한다.
+sequence_index는 **원본 이름의 순번이며 밀리초가 아니다**. timestamp_ms/FPS/길이는 쓰지 않는다.
+대표 condition은 low_light, clips.csv에서 tunnel_polygons>0이면 tags=tunnel이다.
+
+B는 evaluation 목록만 `data/frames/orig/`에 PNG로 만들고 tuning은 별도 폴더로 준비한다.
+원본 해상도·BGR 픽셀을 유지하고 공간 변환을 하지 않는다. 실제 캡처 시간은 알 수 없으므로
+B의 공통 평가표 연결 방식은 별도 합의 대상이다. A가 video timestamp를 만들어 넣지 않는다.
+PNG 준비와 C의 차량 라벨 변환을 이 도구가 대신 실행하지 않는다.
+
+출력 폴더가 이미 있으면 재선정·덮어쓰기를 거부한다. 중간 실패로 불완전한 폴더가 남으면
+검사 후 별도로 보관하고 재시도한다. 최종 목록 변경은 팀 합의 후 별도 이력으로 남긴다.
