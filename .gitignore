@@ -259,3 +259,6 @@ data/clear/
 # Local team datasets and archive
 /team_data/
 /team_data.zip
+
+# Local AI Hub frame-selection manifests and provenance
+/data/manifests/a_night/
