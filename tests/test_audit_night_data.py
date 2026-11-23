@@ -78,3 +78,11 @@ def test_serial_and_parallel_reports_are_identical(tmp_path):
     assert audit_dataset(root, decode_images=True, workers=1) == audit_dataset(root, decode_images=True, workers=4)
     with pytest.raises(ValueError, match="workers"):
         audit_dataset(root, workers=0)
+
+
+def test_non_object_label_is_reported(tmp_path):
+    root = dataset(tmp_path)
+    (root / "labels/Clip_000/frame.json").write_text("[]")
+    report = audit_dataset(root, workers=4)
+    assert report["summary"]["issues"] == 1
+    assert "JSON object" in report["issues"][0]["message"]
