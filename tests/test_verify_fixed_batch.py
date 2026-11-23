@@ -22,6 +22,12 @@ def test_valid_real_batch_contract(batch):
     assert report["frames_verified"] == 1 and report["originals_unchanged"]
 
 
+def test_non_object_snapshot_is_rejected(batch):
+    orig, fixed, log, _ = batch
+    with pytest.raises(ValueError, match="Invalid original snapshot"):
+        verify_outputs(orig, fixed, log, [])
+
+
 @pytest.mark.parametrize("change", ["original", "extra", "missing", "shape", "params", "nan", "negative", "missing_log", "total"])
 def test_reject_invalid_handoff(batch, change):
     orig, fixed, log, baseline = batch

@@ -44,6 +44,8 @@ def verify_outputs(original, fixed, params_path, snapshot):
     recomputed pixel correctness; pixel correctness is covered by DIP tests.
     """
     orig, outputs = _files(original), _files(fixed)
+    if not isinstance(snapshot, dict):
+        raise ValueError("Invalid original snapshot")
     expected = snapshot.get("frames")
     if snapshot.get("schema_version") != 1 or not isinstance(expected, dict) or not expected:
         raise ValueError("Invalid original snapshot")
