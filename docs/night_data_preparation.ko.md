@@ -37,6 +37,8 @@ python -m tools.audit_night_data --decode-images \
   `group`으로 남기고 폭 100px 이상 차량 보유 프레임 집계에서 제외한다.
 - `--decode-images`를 주면 전체 이미지를 디코딩하고 라벨 해상도와 비교한다.
   생략하면 라벨·파일 대응만 검사하므로 이미지 손상 여부는 검증하지 않은 것이다.
+- CLI는 읽기 전용 작업자 4개를 사용한다(`--workers 1..8`). 선정의 라벨 검사도 4개를 쓴다.
+  완료 순서와 관계없이 결과를 원본 경로순으로 정렬하며, 직렬·병렬 결과 동일성을 테스트한다.
 - 결과에 장면·프레임별 상태와 라벨 SHA-256을 남기지만 무작위 추출·밝기 계산·보정은 하지 않는다.
   `selection_status=not_selected`, `capture_timing=unknown`을 명시한다.
 

@@ -119,7 +119,7 @@ def main(argv=None):
     try:
         if output.exists():
             raise FileExistsError("Selection output already exists; never overwrite a frozen list")
-        report = audit_dataset(root)
+        report = audit_dataset(root, workers=4)
         metadata = read_metadata(root / "clips.csv")
         selection = choose_frames(report, metadata)
         labels = {f["source"]: f["label_sha256"] for f in report["frames"]}
