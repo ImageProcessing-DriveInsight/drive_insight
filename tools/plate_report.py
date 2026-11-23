@@ -18,7 +18,9 @@ Run it again after A's or B's enhancement changes so all numbers come from one r
 
 Usage:
     python tools/plate_report.py [--frames data/frames] [--results results] [--labels data/labels]
-                                 [--scenes data/annotations/scenes.json] [--skip-ocr] [--hide N]
+                                 [--scenes data/annotations/scenes.json [FILE ...]] [--skip-ocr] [--hide N]
+
+Per environment condition (fog, low light, rain, ...): tools/env_report.py after this run (#92).
 """
 
 import argparse
@@ -31,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 from src.eval.aggregate import aggregate  # noqa: E402
 from src.eval.compare import write_compare  # noqa: E402
 from src.eval.ocr import eval_conditions, write_summary  # noqa: E402
-from src.eval.vehicles import SCENES, detect_frames, write_rates, write_vehicle_compare  # noqa: E402
+from src.eval.vehicles import SCENES, detect_frames, scenes_arg, write_rates, write_vehicle_compare  # noqa: E402
 from src.plate.run import CONDITIONS, REFERENCE, run_ocr  # noqa: E402
 from tools.compare_images import write_images, write_vehicle_images  # noqa: E402
 
@@ -107,13 +109,14 @@ def main():
     ap.add_argument("--frames", type=Path, default=FRAMES, help="folder with orig/, fixed/, adaptive/, clear/")
     ap.add_argument("--results", type=Path, default=RESULTS)
     ap.add_argument("--labels", type=Path, default=LABELS)
-    ap.add_argument("--scenes", type=Path, default=SCENES, help="vehicle labels; the vehicle rate is skipped without them")
+    ap.add_argument("--scenes", type=Path, nargs="+", help="vehicle label files, merged (default: "
+                    "data/annotations/scenes.json); the vehicle rate is skipped without them")
     ap.add_argument("--skip-ocr", action="store_true", help="reuse <results>/ocr/<cond>.csv")
     ap.add_argument("--hide", type=int, default=0, help="cover the last N characters in the slide images")
     args = ap.parse_args()
-    scenes = args.scenes if args.scenes.exists() else None
+    scenes = scenes_arg(args.scenes)
     if scenes is None:
-        print(f"no vehicle labels at {args.scenes}: skipping the vehicle detection rate")
+        print(f"no vehicle labels at {SCENES}: skipping the vehicle detection rate")
     report(args.frames, args.results, args.labels, args.skip_ocr, args.hide, scenes=scenes)
 
 

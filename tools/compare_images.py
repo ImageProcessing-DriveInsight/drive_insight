@@ -35,7 +35,7 @@ images and the vehicle lists are not covered.
 
 Usage:
     python tools/compare_images.py [--results DIR] [--labels PATH] [--frames-dir DIR] [--out DIR]
-                                   [--top N] [--hide N] [--frames FRAME ...] [--scenes PATH]
+                                   [--top N] [--hide N] [--frames FRAME ...] [--scenes PATH ...]
 """
 
 import argparse
@@ -48,7 +48,7 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src.eval.ocr import frame_key, load_labels, plate_details  # noqa: E402
-from src.eval.vehicles import SCENES, load_detections, load_vehicles, vehicle_reads  # noqa: E402
+from src.eval.vehicles import SCENES, load_detections, load_vehicles, scenes_arg, vehicle_reads  # noqa: E402
 from src.plate.imgutil import load_png  # noqa: E402
 from tools.label_draft import font  # noqa: E402
 
@@ -392,11 +392,13 @@ def main():
     ap.add_argument("--top", type=int, default=6, help="plates per list")
     ap.add_argument("--hide", type=int, default=0, help="cover the last N characters of every labeled plate")
     ap.add_argument("--frames", nargs="+", help="frame images for these frames instead of the listed ones")
-    ap.add_argument("--scenes", type=Path, default=SCENES, help="vehicle labels; no vehicle lists without them")
+    ap.add_argument("--scenes", type=Path, nargs="+",
+                    help="vehicle label files, merged (default: data/annotations/scenes.json); no vehicle lists without them")
     args = ap.parse_args()
     paths = write_images(args.results, args.labels, args.frames_dir, args.out, args.top, args.hide, args.frames)
-    if args.scenes.exists():
-        paths += write_vehicle_images(args.results, args.scenes, args.labels, args.frames_dir, args.out, args.top,
+    scenes = scenes_arg(args.scenes)
+    if scenes is not None:
+        paths += write_vehicle_images(args.results, scenes, args.labels, args.frames_dir, args.out, args.top,
                                       args.hide)
     print("\n".join(str(p) for p in paths) if paths else "no plate changed between conditions")
 
