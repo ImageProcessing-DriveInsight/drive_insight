@@ -96,3 +96,48 @@ PNG 준비와 C의 차량 라벨 변환을 이 도구가 대신 실행하지 않
 
 출력 폴더가 이미 있으면 재선정·덮어쓰기를 거부한다. 중간 실패로 불완전한 폴더가 남으면
 검사 후 별도로 보관하고 재시도한다. 최종 목록 변경은 팀 합의 후 별도 이력으로 남긴다.
+
+## A 고정 보정 산출물 검증 (#99)
+
+B가 모든 조건의 최종 evaluation PNG만 `data/frames/orig/`에 준비한 뒤 실행한다.
+tuning은 별도 폴더에 두며 evaluation과 합치지 않는다. 이 명령은 아직 없는 B 산출물을
+만들어낸 것으로 간주하지 않으며, C/D의 평가를 대신하지 않는다.
+
+```bash
+# 보정 전에 원본 파일명·SHA-256·해상도 기록 (새 파일만 허용)
+python -m tools.verify_fixed_batch snapshot --snapshot data/annotations/fixed_orig_snapshot.json
+# 기존 A-09 실행기: 모든 프레임에 동일 FIXED_PARAMS, 파일 I/O 포함 시간도 별도 기록
+python -m src.dip.batch
+# 실행 전 스냅샷과 대조: 원본 불변·파일 목록·크기·파라미터·시간 기록 확인
+python -m tools.verify_fixed_batch verify --snapshot data/annotations/fixed_orig_snapshot.json
+```
+
+튜닝은 `--orig`, `--fixed`, `--params`, `--snapshot`으로 독립 경로를 주고,
+batch에도 `--input-dir`, `--output-dir`, `--params-path`를 맞춰 준다.
+원본 스냅샷을 보정 후에 만들어 원본 보존 증거로 사용하면 안 된다.
+
+검증 범위는 PNG 목록 일치, 원본 바이트 보존, 원본/fixed 해상도 일치,
+모든 로그의 동일 FIXED_PARAMS, 유한한 음이 아닌 enhance_ms/total_ms,
+total_ms>=enhance_ms다. 변경·누락·오래된 출력·로그 누락을 실패로 처리한다.
+현재 명령은 산출물 계약 검증이며 보정 화질, 프레임 선정의 정당성,
+픽셀 연산의 독립적 재계산이나 런타임 경쟁 접근의 완전한 방지는 증명하지 않는다.
+실행 중 다른 프로세스가 원본/출력/로그를 변경하지 않도록 한다.
+
+## 처리 시간 측정과 튜닝 정책
+
+- FIXED_PARAMS는 기존 초기 기준값을 유지한다. 튜닝 자료만으로 변경 근거를 기록하고
+  확정한 뒤 평가를 실행한다. 야간만 보고 모든 조건의 기준값을 바꾸지 않는다.
+- 데이터 해상도는 1920×1200이다. 기존 1920×1080 측정 결과와 구분한다.
+- 보정 벤치마크는 기존 도구의 워밍업 2회·측정 5회를 사용한다(이번 운영 선택).
+  입력 생성·디코딩·로그 I/O를 제외한 연산 호출 시간이며, batch의 I/O 포함 total_ms와 다르다.
+- C의 OCR 모델 초기화(워밍업 1회 제외) 제안은 OCR 담당 범위다. A 로그에서 첫 평가 프레임을
+  버리거나 누락시키지 않는다. 워밍업은 별도 호출로 한다.
+
+```bash
+python -m tools.benchmark_dip --width 1920 --height 1200 --warmups 2 --repeats 5 \
+  --output data/annotations/dip_1920x1200_synthetic.json
+```
+
+이는 seed=29 합성 프레임 속도 검증이며 실제 야간의 화질·OCR 개선을 검증하지 않는다.
+도구에 들어 있는 1080p 목표 비교 필드도 1920×1200의 합의된 성능 기준으로 해석하지 않는다.
+실제 PNG 측정 시 `--image`로 튜닝 프레임을 주고 해상도·환경·실험 조건을 기록한다.
