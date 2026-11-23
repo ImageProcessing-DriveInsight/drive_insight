@@ -20,11 +20,19 @@ DEFAULT_ROOT = "team_data/A_night/71588_night_highway_front"
 
 def _index(folder, suffixes, issues):
     indexed = {}
+    parent_links = {}
     for path in sorted(folder.rglob("*")):
         if path.suffix.lower() not in suffixes:
             continue
         relative = path.relative_to(folder)
-        if path.is_symlink() or any(p.is_symlink() for p in path.parents if p != folder.parent):
+        parents = []
+        for parent in path.parents:
+            if parent == folder.parent:
+                break
+            if parent not in parent_links:
+                parent_links[parent] = parent.is_symlink()
+            parents.append(parent_links[parent])
+        if path.is_symlink() or any(parents):
             issues.append({"path": relative.as_posix(), "message": "Symlink input is not supported"})
             continue
         if not path.is_file():
