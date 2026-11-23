@@ -255,3 +255,7 @@ data/clear/
 
 # Per environment condition reports (tools/env_report.py) copy plate texts and crops (#92)
 /results/by_env/
+
+# Local team datasets and archive
+/team_data/
+/team_data.zip
