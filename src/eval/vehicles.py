@@ -20,9 +20,12 @@ it is the reference, and the fog conditions show how many of those vehicles are 
    -> results/vehicle_compare.csv (counts) and results/vehicles/changes.csv (gained and lost
    vehicles with their boxes; git ignores results/vehicles/)
 
+Several label files can be given together (--scenes A B), e.g. B's scenes.json for the own frames
+and the AI Hub conversion (tools/aihub_vehicles.py); a frame labeled in two files is an error (#92).
+
 Usage:
     python -m src.eval.vehicles [--frames data/frames] [--results results]
-                                [--scenes data/annotations/scenes.json] [--skip-detect]
+                                [--scenes data/annotations/scenes.json [FILE ...]] [--skip-detect]
 """
 
 import argparse
@@ -47,11 +50,33 @@ CASE_COLUMNS = ["base", "target", "change", "frame", "size", "x", "y", "w", "h",
 
 
 def load_vehicles(scenes):
-    """scenes.json (path or dict) -> {frame: [bbox, ...]} for the complete frames."""
-    if not isinstance(scenes, dict):
-        scenes = json.loads(Path(scenes).read_text(encoding="utf-8"))
-    return {frame: [list(v["bbox"]) for v in entry.get("vehicles", [])]
-            for frame, entry in scenes.items() if entry.get("annotation_status", "complete") == "complete"}
+    """scenes.json (path or dict), or a list of them -> {frame: [bbox, ...]} for the complete frames.
+
+    A list merges several label files, e.g. B's scenes.json for the own frames and the AI Hub
+    conversion (tools/aihub_vehicles.py, #90). A frame in two of them is an error (#92).
+    """
+    sources = scenes if isinstance(scenes, (list, tuple)) else [scenes]
+    out, origin = {}, {}
+    for i, source in enumerate(sources):
+        data = source if isinstance(source, dict) else json.loads(Path(source).read_text(encoding="utf-8"))
+        for frame, entry in data.items():
+            if frame in origin:
+                raise ValueError(f"frame {frame} is labeled in both {sources[origin[frame]]} and {source}")
+            origin[frame] = i
+            if entry.get("annotation_status", "complete") == "complete":
+                out[frame] = [list(v["bbox"]) for v in entry.get("vehicles", [])]
+    return out
+
+
+def scenes_arg(paths, default=SCENES):
+    """The --scenes value of a command: the given files, all of which must exist, or the default
+    file if it exists; None when there are no vehicle labels."""
+    if not paths:
+        return [default] if Path(default).exists() else None
+    missing = [str(p) for p in paths if not Path(p).exists()]
+    if missing:
+        raise SystemExit(f"no vehicle labels at {', '.join(missing)}")
+    return list(paths)
 
 
 def match(detections, labels, threshold=MATCH_IOU):
@@ -208,15 +233,19 @@ def main():
     ap = argparse.ArgumentParser(description="Vehicle detection rate per condition against the labeled vehicles.")
     ap.add_argument("--frames", type=Path, default=FRAMES, help="folder with orig/, fixed/, adaptive/, clear/")
     ap.add_argument("--results", type=Path, default=RESULTS)
-    ap.add_argument("--scenes", type=Path, default=SCENES)
+    ap.add_argument("--scenes", type=Path, nargs="+",
+                    help="vehicle label files, merged (default: data/annotations/scenes.json)")
     ap.add_argument("--skip-detect", action="store_true", help="reuse results/vehicles/<cond>.json")
     args = ap.parse_args()
+    scenes = scenes_arg(args.scenes)
+    if scenes is None:
+        raise SystemExit(f"no vehicle labels at {SCENES}")
     if not args.skip_detect:
         for cond in CONDITIONS:
             if any((args.frames / cond).glob("*.png")):
                 print(detect_frames(cond, args.frames / cond, args.results))
-    print(write_rates(args.results, args.scenes))
-    print(*write_vehicle_compare(args.results, args.scenes), sep="\n")
+    print(write_rates(args.results, scenes))
+    print(*write_vehicle_compare(args.results, scenes), sep="\n")
 
 
 if __name__ == "__main__":
