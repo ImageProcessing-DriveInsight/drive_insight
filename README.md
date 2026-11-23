@@ -1,1 +1,177 @@
-# drive_insight
+# DriveInsight
+
+Digital Image Processing Team Project 02 · Team 16 Black Box · [한국어](README.ko.md)
+
+DriveInsight enhances dashcam frames taken in hard conditions (night, rain, fog, backlight, tunnels) and
+checks whether the enhancement helps a machine, not only the eye. Every frame is processed in three
+conditions and scored the same way:
+
+| Condition | Meaning |
+| --- | --- |
+| `orig` | the original frame |
+| `fixed` | fixed enhancement: one parameter set for every frame (A) |
+| `adaptive` | adaptive enhancement: image quality is measured and the parameters are chosen per frame (B) |
+
+The three conditions are compared by license plate recognition and vehicle detection (C) and by
+scene summaries from a vision language model (D). The image processing operations are written in
+NumPy by the team; pretrained models are used only for vehicle detection, character recognition
+and the scene summaries (see [Pretrained models and own implementation](#pretrained-models-and-own-implementation)).
+
+```text
+clips / image sequences ──► original PNG frames (B) ──┬─► orig
+                                                       ├─► fixed enhancement (A) ─────► fixed
+                                                       └─► quality → rules → ops (B) ─► adaptive
+each condition ──► vehicles → plate candidates → crop preprocessing → OCR → status (C)
+               ──► scene summary (D)
+all conditions ──► evaluation, aggregation, comparison, per environment condition (C) ──► review package (B)
+```
+
+## Team and modules
+
+| Member | Module | Work |
+| --- | --- | --- |
+| A | `src/dip/` | Color conversion, histogram equalization, gamma, Gaussian and median filters, unsharp masking (NumPy), `apply_ops`, `fixed_enhance`, fixed frame batches, night data checks and frame lists |
+| B | `src/io/`, `src/adaptive/`, `src/package/` | Frame and video I/O, quality measures, rule-based parameters, `adaptive_enhance`, evaluation set and labels, review packages, sensitivity runs |
+| C | `src/plate/`, `src/eval/` | Vehicle and plate detection, crop preprocessing, OCR and status, OCR evaluation, aggregation, comparison, vehicle detection rate, results per environment condition |
+| D | `src/common/`, `src/pipeline/`, `src/vlm/` | Experiment runner and timing, VLM summaries and scoring, project files, submission. Not merged yet (#38) |
+
+Interfaces, folders and the schedule are in the [team plan](docs/plan/team_plan.md); features and their
+status are in the [feature spec](docs/plan/feature_spec.md); all notes are listed in [docs/](docs/README.md).
+
+## Setup
+
+Python 3.12 on Windows (the team's machines). Run every command from the repository root.
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements-plate.txt -r requirements-b.txt -r requirements-dip.txt
+```
+
+- Use one fresh virtual environment. Do not add `requirements-video-io.txt` to it: it pins
+  `opencv-python-headless`, and mixing OpenCV builds can break `cv2`.
+- `requirements-plate.txt` pins `pandas` and `chardet` for one team PC where newer builds were blocked.
+- Model weights are downloaded on the first run: YOLO to `weights/` (ignored by git), PaddleOCR to
+  `~/.paddlex/official_models/`.
+- On Windows, B's notes use `py` in place of `python`; both work.
+
+## Data
+
+Real clips, frames, labels and results are **not in git**: they show or spell real license plates,
+and the AI Hub data may be used only by approved members. They are handed over directly between members.
+
+```text
+data/clips/                        original videos (never modified)
+data/eval_set.csv                  clip, timestamp_ms, condition, source, license (B merges the members' lists)
+data/frames/orig/ fixed/ adaptive/ the same <clip>_<ms>.png in every condition folder
+data/frames/clear/                 clear frames the synthetic fog was made from (C's fog clips only)
+data/annotations/scenes.json       labels per frame: vehicles, plates, events (B's label tool)
+data/annotations/aihub_vehicles.json  AI Hub vehicle labels converted for the vehicle rate (C)
+data/labels/plates.json            plate labels for the OCR evaluation (exported from scenes.json)
+data/plate_countries.json          frames with US plates, if any
+results/                           outputs, see below
+package/<clip>/                    review packages
+```
+
+Frames are always `uint8` BGR arrays of shape `(H, W, 3)`. File names are identical in the three
+condition folders; that is how every condition is scored on the same frames.
+
+## Run
+
+The steps in order. Each owner runs their own step and hands over the files.
+
+| Step | Owner | Command | Output |
+| --- | --- | --- | --- |
+| 1. Merge the members' lists | B | `python -m tools.prepare_data member_a.csv member_b.csv member_c.csv member_d.csv` | `data/eval_set.csv` |
+| 2. Extract original frames | B | `python -m tools.b_cli extract` | `data/frames/orig/` |
+| 3. Labels | B, each owner | `python -m tools.b_labels init`, fill `scenes.json` (drafts: `python tools/label_draft.py draft`), then `python -m tools.b_labels export --require-review` | `data/annotations/scenes.json`, `data/labels/plates.json` |
+| 3a. AI Hub vehicle labels | C | `python tools/aihub_vehicles.py <label folders> [--names names.csv]` | `data/annotations/aihub_vehicles.json` |
+| 4. Fixed enhancement | A | `python -m src.dip.batch` | `data/frames/fixed/`, `results/params/fixed.json` |
+| 5. Adaptive enhancement | B | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
+| 6. Plates, vehicles, evaluation, comparison | C | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
+| 7. Results per environment condition | C | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]` | `results/by_env/` |
+| 8. Scene summaries and runner | D | pending (#38) | `results/vlm/score.csv`, `results/timing.csv` |
+| 9. Review package | B | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
+
+More tools:
+
+```bash
+python -m tools.b_cli video data/clips/<clip>.mp4 --mode adaptive   # enhanced video (also --mode fixed)
+python -m tools.sensitivity --scale 0.8 1.2 --labels data/labels    # B: adaptive thresholds scaled
+python -m tools.audit_night_data --decode-images --output data/annotations/<report>.json   # A: check the night data
+python -m tools.select_night_frames                                 # A: night frame lists by the shared rule
+python -m tools.verify_fixed_batch snapshot --snapshot data/annotations/fixed_orig_snapshot.json   # A: before the batch
+python -m tools.verify_fixed_batch verify --snapshot data/annotations/fixed_orig_snapshot.json     # A: after the batch
+python tools/synth_fog.py make <clear clip> <out>                   # C: synthetic fog from a clear clip
+python tools/pick_frames.py scan <clip>                             # C: timestamps by vehicle size
+python tools/compare_images.py --hide 2                             # C: slide images, last two characters hidden
+```
+
+## Outputs
+
+| File | Content |
+| --- | --- |
+| `results/ocr/<cond>.csv` | one row per plate: box, crop, text, confidence, status (`readable`, `uncertain`, `unreadable`), OCR time |
+| `results/ocr/ocr_summary.csv` | detection rate, exact match, character accuracy, readable but wrong, unreadable but answered readable |
+| `results/summary.csv` | OCR metrics, VLM scores and step times per condition |
+| `results/compare.csv`, `worse_cases.csv` | frames that got better or worse from `orig` to `fixed` and `fixed` to `adaptive`, with a sign test; plates that got worse |
+| `results/vehicles.csv`, `vehicle_compare.csv` | vehicle detection rate by vehicle size; vehicles found or lost between conditions |
+| `results/by_env/` | the same tables per environment condition (fog, low light, rain, tunnel, backlight) |
+| `results/figures/` | slide images of plates and vehicles |
+| `package/<clip>/summary.html` | review package: key frames, OCR, VLM, file list |
+
+`results/ocr/`, `worse_cases.csv`, `results/vehicles/`, `results/figures/` and `results/by_env/` hold
+plate texts or images of real plates and are ignored by git.
+
+## Results so far
+
+Own dashcam clips with synthetic fog (11 clips, 48 frames, 13 readable labeled plates, 222 labeled
+vehicles; [details](docs/dashcam_results.md)):
+
+- Character accuracy 0.81 in the foggy frames, 0.70 after fixed enhancement and 0.81 after adaptive
+  enhancement. Fixed made 5 frames worse and none better (sign test p 0.0625, a direction, not proof).
+- No adaptive rule fired on these frames, so adaptive equals the original.
+- Vehicle detection rate 0.54 in fog (0.12 for vehicles under 100 px wide), 0.51 after fixed enhancement.
+
+The night, rain, tunnel and backlight results follow after integration check 3 (11/24) and D's VLM scores.
+
+## Pretrained models and own implementation
+
+| Part | Pretrained | Own implementation |
+| --- | --- | --- |
+| Image enhancement (A) | – | Color conversion, histogram equalization, gamma, Gaussian and median filters, unsharp masking in NumPy; fixed parameter set |
+| Adaptive enhancement (B) | – | Brightness, contrast, noise and sharpness measures; rule-based parameter choice |
+| Frame and video I/O (B) | OpenCV for reading and writing only | Timestamp extraction, output checks |
+| Vehicle detection (C) | YOLOv8n, Ultralytics 8.4.208, COCO weights, AGPL-3.0 | Class and confidence filter, camera car filter (dashboard and reflections), one box per vehicle |
+| Plate detection (C) | – | Candidate search: vertical edges, brightness, surround contrast on integral images, box growth, NMS, 4 candidates per vehicle |
+| Crop preprocessing (C) | – | Gray conversion, bilinear resize, contrast stretch, polarity, deskew, Otsu |
+| OCR (C) | PaddleOCR 3.7.0, `korean` PP-OCRv5, Apache-2.0 | Line joining, O/I fixes, normalization; US plates: number line only |
+| Plate status (C) | – | `readable` / `uncertain` / `unreadable` rules on the Korean and US plate formats |
+| Evaluation (C) | – | Matching, metrics, aggregation, comparison, sign test, results per condition, slide images |
+| Scene summaries (D) | VLM to be filled in by D (#38) | Prompt, schema, claim checks, scoring |
+| Timestamp picking, synthetic fog (C, tools only) | YOLOv8n boxes, YOLOv8n-seg masks | Near-vehicle rules; Koschmieder fog model, scattering blur with A's Gaussian, sensor noise |
+
+OpenCV is used only for image and video input and output. `python tools/check_forbidden.py src/`
+fails if an OpenCV processing function or a `_stub` function is left in `src/`.
+
+## Tests
+
+```bash
+python -X utf8 -m pytest -q
+python tools/check_forbidden.py src/
+```
+
+The tests use synthetic frames, synthetic labels and model stand-ins, so they need no data or model
+download. On a Korean Windows locale, `-X utf8` is needed: two of B's package tests read text with the
+default encoding.
+
+## Data sources and licenses
+
+| Data | Use | Terms |
+| --- | --- | --- |
+| Own dashcam clips | fog clips (synthetic fog) and OCR | team members' own footage |
+| AI Hub 71588 (night highway), 630 (driving in various weather: rain), 71570 (day highway), 71930 (upcycled from 71570: tunnel images) | enhancement, vehicle detection (vehicle polygons), scene summaries. Plates are masked, so not OCR | AI Hub terms: approved members only, not redistributed, not uploaded outside the team |
+| GLARE (backlight clips) | backlight enhancement and summaries | CC BY 4.0. N. Gray et al., "GLARE: A Dataset for Traffic Sign Detection in Sun Glare," IEEE T-ITS 24(11):12323–12330, 2023, doi:10.1109/TITS.2023.3294411 |
+| BDD100K (night and dusk images, if used) | OCR at night and dusk | F. Yu et al., "BDD100K: A Diverse Driving Dataset for Heterogeneous Multitask Learning," CVPR 2020; BDD100K license terms |
+
+Model licenses are in the table above and in [docs/model_selection.md](docs/model_selection.md).
