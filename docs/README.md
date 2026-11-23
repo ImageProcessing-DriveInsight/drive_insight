@@ -13,6 +13,8 @@
 
 ## Technical notes
 
+A data preparation: [night-data preselection checks and ownership boundaries (Korean)](night_data_preparation.ko.md).
+
 | Doc | English | 한국어 |
 | --- | --- | --- |
 | A-01 to A-09: parameters, decisions, experiments, performance and integration | — | [dip_parameters.ko.md](dip_parameters.ko.md) |

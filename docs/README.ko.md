@@ -13,6 +13,8 @@
 
 ## 기술 노트
 
+A 데이터 준비: [야간 데이터 선정 전 검사와 담당 경계](night_data_preparation.ko.md).
+
 | 문서 | English | 한국어 |
 | --- | --- | --- |
 | A-01~09: 파라미터, 구현 결정, 실험·성능·연동 가이드 | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
