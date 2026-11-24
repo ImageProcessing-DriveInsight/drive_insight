@@ -128,15 +128,22 @@ plate texts or images of real plates and are ignored by git.
 
 ## Results so far
 
-Own dashcam clips with synthetic fog (11 clips, 48 frames, 13 readable labeled plates, 222 labeled
-vehicles; [details](docs/dashcam_results.md)):
+Fog, night and rain, 108 frames in orig, fixed and adaptive ([details](docs/eval_results.md)):
 
-- Character accuracy 0.81 in the foggy frames, 0.70 after fixed enhancement and 0.81 after adaptive
-  enhancement. Fixed made 5 frames worse and none better (sign test p 0.0625, a direction, not proof).
-- No adaptive rule fired on these frames, so adaptive equals the original.
-- Vehicle detection rate 0.54 in fog (0.12 for vehicles under 100 px wide), 0.51 after fixed enhancement.
+- Fog, own dashcam clips with synthetic fog (11 clips, 48 frames, 13 readable labeled plates, 222 labeled
+  vehicles; [details](docs/dashcam_results.md)):
+  - Character accuracy 0.81 in the foggy frames, 0.70 after fixed enhancement and 0.81 after adaptive
+    enhancement. Fixed made 5 frames worse and none better (sign test p 0.0625, a direction, not proof).
+  - No adaptive rule fired on these frames, so adaptive equals the original.
+  - Vehicle detection rate 0.54 in fog (0.12 for vehicles under 100 px wide), 0.51 after fixed enhancement.
+- Night, AI Hub (30 frames, 114 labeled vehicles in 24 of them): vehicle detection rate 0.25 in orig and
+  fixed, 0.22 in adaptive. Adaptive fired on every frame.
+- Rain, AI Hub (30 frames, 82 labeled vehicles): vehicle detection rate 0.10 in orig, 0.11 after fixed
+  and 0.10 after adaptive.
+- At night and in rain, enhancement changes 1–4 vehicles and no difference is significant. AI Hub has
+  no plate text, so the plate metrics cover fog only; no night or rain plate was read.
 
-The night, rain, tunnel and backlight results follow after integration check 3 (11/24) and callmeaein's VLM scores.
+The tunnel and backlight results follow when their frames exist, the VLM results with callmeaein's scores.
 
 ## Pretrained models and own implementation
 

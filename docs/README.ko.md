@@ -42,5 +42,6 @@ A 야간 조건 전달: [확정 30장 원본·fixed 독립 처리와 전체 점�
 | AI Hub 차량 라벨로 차량 검출률 재기 (#90) | [aihub_vehicles.md](aihub_vehicles.md) | [aihub_vehicles.ko.md](aihub_vehicles.ko.md) |
 | 환경 조건별 결과, 차량 라벨 파일 여러 개 (#92) | [env_report.md](env_report.md) | [env_report.ko.md](env_report.ko.md) |
 | 이미지 프레임의 조건·이름 목록 (#108) | [eval_lists.md](eval_lists.md) | [eval_lists.ko.md](eval_lists.ko.md) |
+| 평가 프레임 결과: 안개, 야간, 비 (#116) | [eval_results.md](eval_results.md) | [eval_results.ko.md](eval_results.ko.md) |
 
 계획 문서는 2026-11-16 기준 저장소 상태를 반영합니다.
