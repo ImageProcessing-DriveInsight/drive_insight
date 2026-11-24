@@ -6,7 +6,12 @@ import pytest
 from src.pipeline.runner import run_experiment, save_timing_csv
 
 
-def test_run_experiment_saves_config():
+def test_run_experiment_saves_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "src.pipeline.runner.get_project_root",
+        lambda: tmp_path,
+    )
+
     result = run_experiment("orig")
 
     assert result["condition"] == "orig"
