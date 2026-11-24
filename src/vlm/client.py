@@ -1,43 +1,51 @@
+import base64
 import json
 import logging
 import os
 from pathlib import Path
 
-from google import genai
-from google.genai import types
+import requests
 
 from src.vlm.schema import validate_vlm_response
 
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = "qwen3-vl:4b-instruct"
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434",
+)
 
 SYSTEM_PROMPT = """
 You are a dashcam scene understanding assistant.
 
-Analyze the image and return JSON with exactly these fields:
+Analyze the image carefully  and return JSON with exactly these fields:
 - vehicles: list of strings
 - events: list of objects with order, content, frame
 - visibility_notes: list of strings
 - uncertain: list of strings
 
 Rules:
-1. Never read, transcribe, guess, or output license plate characters.
-2. If a plate is visible, only say "license plate visible".
-3. Do not invent movement or events from a single image.
-4. Put uncertain observations in the uncertain field.
-5. Return valid JSON only.
+1. Detect all clearly visible vehicles, including vehicles in the distance.
+2. Do not return an empty vehicles list when vehicles are clearly visible.
+3. Use simple labels such as car, bus, truck, or motorcycle.
+4. If the vehicle type is unclear, use "vehicle".
+5. Do not invent vehicles that cannot be visually confirmed.
+6. Never read, transcribe, guess, or output license plate characters.
+7. If a plate is visible, only say "license plate visible".
+8. Do not invent movement or events from a single image.
+9. Describe only what is visibly confirmed.
+10. Distinguish fog, mist, rain, and low-light conditions.
+11. Do not infer rain only from poor visibility.
+12. Put uncertain observations in the uncertain field.
+13. Return valid JSON only.
 """
 
 
-def get_gemini_client():
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY is not set.")
-
-    return genai.Client(api_key=api_key)
+def get_ollama_url():
+    """Return the Ollama API URL."""
+    return OLLAMA_URL.rstrip("/") + "/api/generate"
 
 
 def analyze_frame(image_path, prompt=None, frame_number=1):
@@ -56,47 +64,70 @@ def analyze_frame(image_path, prompt=None, frame_number=1):
     if mime_type is None:
         raise ValueError("Unsupported image format.")
 
-    client = get_gemini_client()
+    image_data = base64.b64encode(
+        image_path.read_bytes()
+    ).decode("utf-8")
 
-    image_part = types.Part.from_bytes(
-        data=image_path.read_bytes(),
-        mime_type=mime_type,
-    )
+    user_prompt = (
+        prompt or SYSTEM_PROMPT
+    ) + f"\nAnalyze this as frame {frame_number}."
 
-    user_prompt = prompt or SYSTEM_PROMPT
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": user_prompt,
+        "images": [image_data],
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": 0,
+            "num_predict": 1024,
+        },
+    }
 
     for attempt in range(2):
-        retry_instruction = ""
-
         if attempt == 1:
-            retry_instruction = """
-Your previous response did not pass JSON/schema validation.
-Please correct it and return valid JSON with exactly the required fields.
-Follow the required event structure:
-order (integer), content (string), frame (integer).
+            payload["prompt"] += """
+Your previous response failed JSON/schema validation.
+Return exactly the required four fields.
+Each event must contain integer order, string content, and integer frame.
+Return JSON only.
 """
 
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=[
-                user_prompt + retry_instruction,
-                f"Analyze this as frame {frame_number}.",
-                image_part,
-            ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0,
-            ),
-        )
-
         try:
-            result = json.loads(response.text)
+            response = requests.post(
+                get_ollama_url(),
+                json=payload,
+                timeout=300,
+            )
+            response.raise_for_status()
+            response_data = response.json()
+
+            result = json.loads(
+                response_data.get("response", "")
+            )
 
             if validate_vlm_response(result):
                 return result
 
-        except (json.JSONDecodeError, TypeError):
-            pass
+            logger.warning(
+                "Ollama response failed schema validation. "
+                "Attempt: %s, image: %s",
+                attempt + 1,
+                image_path,
+            )
+
+        except (
+            requests.RequestException,
+            json.JSONDecodeError,
+            TypeError,
+        ) as error:
+            logger.warning(
+                "Ollama request/JSON error. "
+                "Attempt: %s, image: %s, error: %s",
+                attempt + 1,
+                image_path,
+                error,
+            )
 
     logger.error(
         "VLM response failed JSON/schema validation after one retry. "

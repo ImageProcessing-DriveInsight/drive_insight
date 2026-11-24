@@ -267,4 +267,7 @@ data/clear/
 # Local real-evaluation fixed parameter/timing handoff
 /results/params/fixed.json
 # Local VLM test images
+
+.venv311/
+
 test_images/

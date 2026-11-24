@@ -10,7 +10,7 @@ VALID_RESPONSE = {
     "events": [
         {
             "order": 1,
-            "description": "A car turns left",
+            "content": "A car is visible near the intersection",
             "frame": 2,
         }
     ],
@@ -20,47 +20,46 @@ VALID_RESPONSE = {
 
 
 class FakeResponse:
-    def __init__(self, text):
-        self.text = text
+    def __init__(self, data):
+        self.data = data
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self.data
 
 
-class FakeModels:
+class FakeRequests:
     def __init__(self, responses):
         self.responses = responses
         self.calls = []
 
-    def generate_content(self, **kwargs):
-        self.calls.append(kwargs)
+    def post(self, url, **kwargs):
+        self.calls.append({"url": url, **kwargs})
         return self.responses.pop(0)
-
-
-class FakeGeminiClient:
-    def __init__(self, responses):
-        self.models = FakeModels(responses)
 
 
 def test_retry_once_then_success(tmp_path, monkeypatch):
     image = tmp_path / "frame.png"
     image.write_bytes(b"fake image data")
 
-    fake = FakeGeminiClient([
-        FakeResponse('{"wrong_field": []}'),
-        FakeResponse(json.dumps(VALID_RESPONSE)),
+    fake = FakeRequests([
+        FakeResponse({"response": '{"wrong_field": []}'}),
+        FakeResponse({"response": json.dumps(VALID_RESPONSE)}),
     ])
 
-    monkeypatch.setattr(
-        vlm_client,
-        "get_gemini_client",
-        lambda: fake,
-    )
+    monkeypatch.setattr(vlm_client, "requests", fake)
 
-    result = vlm_client.analyze_frame(image)
+    result = vlm_client.analyze_frame(image, frame_number=2)
 
     assert result == VALID_RESPONSE
-    assert len(fake.models.calls) == 2
+    assert len(fake.calls) == 2
 
-    for call in fake.models.calls:
-        assert call["config"].temperature == 0
+    for call in fake.calls:
+        assert call["json"]["model"] == "qwen3-vl:4b-instruct"
+        assert call["json"]["options"]["temperature"] == 0
+        assert call["json"]["stream"] is False
 
     print("PASS: Retry once, then success")
 
@@ -69,20 +68,25 @@ def test_retry_failure_raises_error(tmp_path, monkeypatch):
     image = tmp_path / "frame.png"
     image.write_bytes(b"fake image data")
 
-    fake = FakeGeminiClient([
-        FakeResponse('{"wrong_field": []}'),
-        FakeResponse('{"still_wrong": []}'),
+    fake = FakeRequests([
+        FakeResponse({"response": '{"wrong_field": []}'}),
+        FakeResponse({"response": '{"still_wrong": []}'}),
     ])
 
-    monkeypatch.setattr(
-        vlm_client,
-        "get_gemini_client",
-        lambda: fake,
-    )
+    monkeypatch.setattr(vlm_client, "requests", fake)
 
     with pytest.raises(ValueError, match="after one retry"):
         vlm_client.analyze_frame(image)
 
-    assert len(fake.models.calls) == 2
+    assert len(fake.calls) == 2
 
     print("PASS: Retry failure raises ValueError")
+
+
+def test_missing_image_raises_error(tmp_path):
+    image = tmp_path / "missing.png"
+
+    with pytest.raises(FileNotFoundError):
+        vlm_client.analyze_frame(image)
+
+    print("PASS: Missing image raises FileNotFoundError")
