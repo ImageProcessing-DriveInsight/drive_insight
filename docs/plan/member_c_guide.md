@@ -91,6 +91,7 @@ python tools/synth_fog.py make <clear> <out>   # ALL-01: foggy clip from a clear
 python tools/compare_images.py                 # C-11: plate, frame and vehicle images for slides (--hide 2)
 python tools/plate_report.py                   # C-08 to C-11 in one run: OCR on every condition, then evaluation to images (#81)
 python tools/aihub_vehicles.py <labels> ...    # #90: AI Hub vehicle labels → data/annotations/aihub_vehicles.json
+python tools/eval_lists.py --list <list> <condition> ...   # #108: members' frame lists → data/annotations/envs.csv, eval_names.csv
 python tools/env_report.py                     # #92: plate_report results per environment condition → results/by_env/
 ```
 

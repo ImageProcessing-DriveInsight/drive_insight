@@ -91,6 +91,7 @@ python tools/synth_fog.py make <clear> <out>   # ALL-01: 맑은 날 영상으로
 python tools/compare_images.py                 # C-11: 발표용 번호판·프레임·차량 이미지 (--hide 2)
 python tools/plate_report.py                   # C-08~C-11 한 번에: 모든 조건 OCR, 이어서 평가부터 이미지까지 (#81)
 python tools/aihub_vehicles.py <labels> ...    # #90: AI Hub 차량 라벨 → data/annotations/aihub_vehicles.json
+python tools/eval_lists.py --list <목록> <조건> ...   # #108: 팀원 프레임 목록 → data/annotations/envs.csv, eval_names.csv
 python tools/env_report.py                     # #92: plate_report 결과를 환경 조건별로 → results/by_env/
 ```
 

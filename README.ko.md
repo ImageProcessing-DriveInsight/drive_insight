@@ -64,6 +64,7 @@ data/frames/orig/ fixed/ adaptive/ 세 조건 폴더에 같은 <clip>_<ms>.png
 data/frames/clear/                 합성 안개를 만든 맑은 프레임 (sangwon5579의 안개 클립만)
 data/annotations/scenes.json       프레임별 라벨: 차량, 번호판, 사건 (leojuho의 라벨 도구)
 data/annotations/aihub_vehicles.json  차량 검출률용으로 바꾼 AI Hub 차량 라벨 (sangwon5579)
+data/annotations/envs.csv          이미지 프레임(AI Hub 등)마다 조건 (sangwon5579)
 data/labels/plates.json            OCR 평가용 번호판 라벨 (scenes.json에서 내보냄)
 data/plate_countries.json          미국 번호판 프레임 (있을 때만)
 results/                           출력, 아래 참고
@@ -81,11 +82,12 @@ package/<clip>/                    리뷰 패키지
 | 1. 팀원 목록 합치기 | leojuho | `python -m tools.prepare_data member_a.csv member_b.csv member_c.csv member_d.csv` | `data/eval_set.csv` |
 | 2. 원본 프레임 추출 | leojuho | `python -m tools.b_cli extract` | `data/frames/orig/` |
 | 3. 라벨 | leojuho, 각 담당 | `python -m tools.b_labels init`, `scenes.json` 채우기(초안: `python tools/label_draft.py draft`), `python -m tools.b_labels export --require-review` | `data/annotations/scenes.json`, `data/labels/plates.json` |
-| 3a. AI Hub 차량 라벨 | sangwon5579 | `python tools/aihub_vehicles.py <라벨 폴더> [--names names.csv]` | `data/annotations/aihub_vehicles.json` |
+| 3a. 이미지 프레임 목록 | sangwon5579 | `python tools/eval_lists.py --list <팀원 목록> <조건> ...` | `data/annotations/envs.csv`, `eval_names.csv` |
+| 3b. AI Hub 차량 라벨 | sangwon5579 | `python tools/aihub_vehicles.py <라벨 폴더> --names data/annotations/eval_names.csv` | `data/annotations/aihub_vehicles.json` |
 | 4. 고정 보정 | h1gyeon9 | `python -m src.dip.batch` | `data/frames/fixed/`, `results/params/fixed.json` |
 | 5. 적응형 보정 | leojuho | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
 | 6. 번호판, 차량, 평가, 비교 | sangwon5579 | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
-| 7. 환경 조건별 결과 | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]` | `results/by_env/` |
+| 7. 환경 조건별 결과 | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json --envs data/annotations/envs.csv` | `results/by_env/` |
 | 8. 장면 요약과 실행기 | callmeaein | 진행 중(#38) | `results/vlm/score.csv`, `results/timing.csv` |
 | 9. 리뷰 패키지 | leojuho | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
 

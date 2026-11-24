@@ -35,5 +35,6 @@ A tuning review: [tuning-only candidate comparisons and human feedback (Korean)]
 | Results on own dashcam clips: clear, fog, fixed, adaptive (#78) | [dashcam_results.md](dashcam_results.md) | [dashcam_results.ko.md](dashcam_results.ko.md) |
 | Vehicle detection rate on AI Hub vehicle labels (#90) | [aihub_vehicles.md](aihub_vehicles.md) | [aihub_vehicles.ko.md](aihub_vehicles.ko.md) |
 | Results per environment condition, several vehicle label files (#92) | [env_report.md](env_report.md) | [env_report.ko.md](env_report.ko.md) |
+| Frame condition and name lists for image frames (#108) | [eval_lists.md](eval_lists.md) | [eval_lists.ko.md](eval_lists.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.

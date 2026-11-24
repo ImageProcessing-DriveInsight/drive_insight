@@ -8,7 +8,7 @@ OCR과 차량 검출은 다시 돌리지 않은 채 평가·집계·비교만 �
 
 ```
 python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json
-python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]
+python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs data/annotations/envs.csv]
 ```
 
 ## 출력
@@ -22,7 +22,7 @@ python tools/env_report.py --scenes data/annotations/scenes.json data/annotation
 
 - `data/eval_set.csv`: `<클립 이름>_<timestamp_ms>.png`(B의 프레임 이름)는 그 행의 `condition`을 따릅니다.
   행의 `clip`은 VLM 점수를 나눌 때 씁니다.
-- `--envs`: `frame`, `env` 열(선택: `clip`)이 있는 CSV입니다. 타임스탬프가 없는 AI Hub 프레임처럼 이름 규칙이 다른 프레임에 씁니다.
+- `--envs`: `frame`, `env` 열(선택: `clip`)이 있는 CSV입니다. 타임스탬프가 없는 AI Hub 프레임처럼 이름 규칙이 다른 프레임에 씁니다. 팀원의 프레임 목록으로 `tools/eval_lists.py`가 만듭니다([#108](eval_lists.ko.md)).
   `eval_set.csv`보다 우선합니다.
 - 조건을 알 수 없는 프레임이 하나라도 있으면 멈춥니다. 어느 조건에도 들어가지 않고 빠지는 프레임이 없게 하려는 것입니다.
 
