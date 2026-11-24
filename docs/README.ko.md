@@ -17,6 +17,8 @@ A 데이터 준비: [야간 데이터 선정 전 검사와 담당 경계](night_
 
 A 튜닝 검토: [튜닝 전용 후보 비교·시각 검토와 피드백](night_tuning_review.ko.md).
 
+A 비 조건 전달: [기존 고정값 적용·산출물 검증·전달 범위](rain_fixed_handoff.ko.md).
+
 | 문서 | English | 한국어 |
 | --- | --- | --- |
 | A-01~09: 파라미터, 구현 결정, 실험·성능·연동 가이드 | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
