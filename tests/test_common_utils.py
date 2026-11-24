@@ -16,6 +16,7 @@ def test_get_paths():
 
     assert paths["root"] == get_project_root()
     assert paths["data"] == get_project_root() / "data"
+    assert paths["frames"] == get_project_root() / "data" / "frames"
     assert paths["results"] == get_project_root() / "results"
     assert paths["weights"] == get_project_root() / "weights"
 

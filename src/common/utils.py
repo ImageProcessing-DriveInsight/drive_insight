@@ -19,7 +19,7 @@ def get_paths():
     return {
         "root": PROJECT_ROOT,
         "data": PROJECT_ROOT / "data",
-        "frames": PROJECT_ROOT / "frames",
+        "frames": PROJECT_ROOT / "data" / "frames",
         "results": PROJECT_ROOT / "results",
         "weights": PROJECT_ROOT / "weights",
         "src": PROJECT_ROOT / "src",
