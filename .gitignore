@@ -263,3 +263,6 @@ data/clear/
 # Local AI Hub frame-selection manifests and provenance
 /data/manifests/a_night/
 /data/manifests/a_night.zip
+
+# Local real-evaluation fixed parameter/timing handoff
+/results/params/fixed.json
