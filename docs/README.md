@@ -42,5 +42,6 @@ A night handoff: [isolated original/fixed delivery for the frozen 30 frames; no 
 | Vehicle detection rate on AI Hub vehicle labels (#90) | [aihub_vehicles.md](aihub_vehicles.md) | [aihub_vehicles.ko.md](aihub_vehicles.ko.md) |
 | Results per environment condition, several vehicle label files (#92) | [env_report.md](env_report.md) | [env_report.ko.md](env_report.ko.md) |
 | Frame condition and name lists for image frames (#108) | [eval_lists.md](eval_lists.md) | [eval_lists.ko.md](eval_lists.ko.md) |
+| Results on the evaluation frames: fog, night, rain (#116) | [eval_results.md](eval_results.md) | [eval_results.ko.md](eval_results.ko.md) |
 
 Plan docs reflect the repository as of Nov 16, 2026.

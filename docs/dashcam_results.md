@@ -6,6 +6,10 @@ First real numbers for C's part: own clear-day dashcam clips with synthetic fog,
 original (foggy), fixed and adaptive frames, and in the clear frames the fog was made from (#79).
 Only numbers are here. Clips, frames, labels, crops, slide images and plate texts stay outside git.
 
+The rerun on 11/24 with the night and rain frames (#116, [results on the evaluation frames](eval_results.md))
+gave the same OCR and vehicle numbers as below. Only the times were measured again on one PC; the new
+times are there.
+
 ## Setup
 
 | | |
