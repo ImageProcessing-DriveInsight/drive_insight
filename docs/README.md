@@ -19,6 +19,8 @@ A tuning review: [tuning-only candidate comparisons and human feedback (Korean)]
 
 A rain handoff: [unchanged fixed baseline, output verification and partial delivery scope (Korean)](rain_fixed_handoff.ko.md).
 
+A night handoff: [isolated original/fixed delivery for the frozen 30 frames; no whole-project checks (Korean)](night_fixed_handoff.ko.md).
+
 | Doc | English | 한국어 |
 | --- | --- | --- |
 | A-01 to A-09: parameters, decisions, experiments, performance and integration | — | [dip_parameters.ko.md](dip_parameters.ko.md) |
