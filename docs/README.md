@@ -13,6 +13,8 @@
 
 ## Technical notes
 
+A interim rain/night consolidation: [60 existing frames, log backup and partial handoff (#114, Korean)](interim_fixed_merge.ko.md).
+
 A data preparation: [night-data preselection checks and ownership boundaries (Korean)](night_data_preparation.ko.md).
 
 A tuning review: [tuning-only candidate comparisons and human feedback (Korean)](night_tuning_review.ko.md).

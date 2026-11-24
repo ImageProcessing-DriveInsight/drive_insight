@@ -13,6 +13,8 @@
 
 ## 기술 노트
 
+A 비·야간 중간 통합: [기존 60장 병합·백업·부분 전달물 (#114)](interim_fixed_merge.ko.md).
+
 A 데이터 준비: [야간 데이터 선정 전 검사와 담당 경계](night_data_preparation.ko.md).
 
 A 튜닝 검토: [튜닝 전용 후보 비교·시각 검토와 피드백](night_tuning_review.ko.md).
