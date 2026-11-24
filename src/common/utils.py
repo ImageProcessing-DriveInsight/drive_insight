@@ -6,6 +6,24 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def get_project_root():
+    """Return the absolute project root directory."""
+    return PROJECT_ROOT
+
+
+def get_paths():
+    """Return commonly used project paths."""
+    return {
+        "root": PROJECT_ROOT,
+        "data": PROJECT_ROOT / "data",
+        "frames": PROJECT_ROOT / "frames",
+        "results": PROJECT_ROOT / "results",
+        "weights": PROJECT_ROOT / "weights",
+        "src": PROJECT_ROOT / "src",
+    }
 
 
 def validate_frame(frame):

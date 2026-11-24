@@ -1,4 +1,3 @@
-
 from typing import Any
 
 
@@ -16,27 +15,36 @@ def validate_vlm_response(data: dict[str, Any]) -> bool:
     if not isinstance(data, dict):
         return False
 
-    if not REQUIRED_FIELDS.issubset(data.keys()):
+    if set(data.keys()) != REQUIRED_FIELDS:
         return False
 
-    for field in REQUIRED_FIELDS:
+    for field in ("vehicles", "visibility_notes", "uncertain"):
         if not isinstance(data[field], list):
             return False
+
+        if not all(isinstance(item, str) for item in data[field]):
+            return False
+
+    if not isinstance(data["events"], list):
+        return False
 
     for event in data["events"]:
         if not isinstance(event, dict):
             return False
 
-        if not {"order", "description", "frame"}.issubset(event.keys()):
+        if not {"order", "frame"}.issubset(event.keys()):
             return False
 
-        if not isinstance(event["order"], int):
+        has_content = isinstance(event.get("content"), str)
+        has_description = isinstance(event.get("description"), str)
+
+        if not (has_content or has_description):
             return False
 
-        if not isinstance(event["description"], str):
+        if type(event["order"]) is not int:
             return False
 
-        if not isinstance(event["frame"], int):
+        if type(event["frame"]) is not int:
             return False
 
     return True

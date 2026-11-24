@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -8,14 +9,16 @@ from google.genai import types
 from src.vlm.schema import validate_vlm_response
 
 
-MODEL_NAME = "gemini-3.1-flash-lite"
+logger = logging.getLogger(__name__)
+
+MODEL_NAME = "gemini-3.8-flash"
 
 SYSTEM_PROMPT = """
 You are a dashcam scene understanding assistant.
 
 Analyze the image and return JSON with exactly these fields:
 - vehicles: list of strings
-- events: list of objects with order, description, frame
+- events: list of objects with order, content, frame
 - visibility_notes: list of strings
 - uncertain: list of strings
 
@@ -70,7 +73,7 @@ def analyze_frame(image_path, prompt=None, frame_number=1):
 Your previous response did not pass JSON/schema validation.
 Please correct it and return valid JSON with exactly the required fields.
 Follow the required event structure:
-order (integer), description (string), frame (integer).
+order (integer), content (string), frame (integer).
 """
 
         response = client.models.generate_content(
@@ -94,6 +97,13 @@ order (integer), description (string), frame (integer).
 
         except (json.JSONDecodeError, TypeError):
             pass
+
+    logger.error(
+        "VLM response failed JSON/schema validation after one retry. "
+        "Image: %s, frame: %s",
+        image_path,
+        frame_number,
+    )
 
     raise ValueError(
         "VLM response failed JSON/schema validation after one retry."

@@ -6,7 +6,7 @@ import hashlib
 import csv
 from pathlib import Path
 
-from src.common.utils import get_logger, Timer
+from src.common.utils import get_logger, Timer, get_project_root
 
 logger = get_logger(__name__)
 
@@ -55,7 +55,7 @@ def run_experiment(condition, steps=None, frame_lists=None):
     )
 
     # Create the project results directory.
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = get_project_root()
     result_dir = project_root / "results" / condition
     result_dir.mkdir(parents=True, exist_ok=True)
 
