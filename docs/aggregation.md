@@ -13,13 +13,25 @@ python -m src.eval.aggregate --labels data/labels   # score results/ocr/<cond>.c
 
 ## Inputs
 
-All paths are under `results/`. Every file needs a `condition` column. A missing file leaves its columns empty, so the summary can be built before all results exist.
+All paths are under `results/`. Every file needs a `condition` column (except per-condition timing files). A missing file leaves its columns empty, so the summary can be built before all results exist.
 
 | File | From | Used columns |
 | --- | --- | --- |
 | `ocr/ocr_summary.csv` | C-09 `python -m src.eval.ocr` | `plates`, `detection_rate`, `exact_match`, `char_accuracy`, `overconfident`, `readable_wrong` |
 | `vlm/score.csv` | D-08 `score_vlm` | see below |
-| `timing.csv` | D-04 runner | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+| `timing.csv`, `<cond>/timing.csv` | D-04 runner | `frame`, `enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms` |
+| `ocr/<cond>.csv`, `params/<cond>.json` | C-08 OCR run; A's fixed batch, B's adaptive batch | `ocr_ms`; `enhance_ms`, only for a condition without a timing file |
+
+Timing can be one `timing.csv` or one file per condition folder, as D's runner writes it
+(`results/fixed/timing.csv`). In a per-condition file the `condition` column may be missing or
+empty; the folder name is used. The same condition and frame in two files stops the summary,
+so no frame is counted twice.
+
+Until D's runner writes timing files, a condition without one takes its step times from the stage
+logs (#78): `ocr_ms` from `ocr/<cond>.csv` (once per frame) and `enhance_ms` from
+`params/<cond>.json`. `orig` has no enhancement step, and `total_ms` stays empty because the VLM
+step is not in these logs. The first OCR frame includes loading the models (about 6.5 s), so it raises
+the mean a little.
 
 ### `vlm/score.csv` (proposal for D)
 
@@ -43,7 +55,7 @@ One row per condition and clip. Empty or `N/A` means not available.
 
 | Column | Meaning |
 | --- | --- |
-| `condition` | `orig`, `fixed`, `adaptive` first, then any other value found |
+| `condition` | `orig`, `fixed`, `adaptive` first, then any other value found, e.g. the `clear` reference ([OCR evaluation](ocr_evaluation.md#clear-reference-79)) |
 | `plates` | readable labeled plates (denominator of the OCR rates) |
 | `detection_rate`, `exact_match`, `char_accuracy` | 0–1, see [ocr_evaluation.md](ocr_evaluation.md) |
 | `overconfident`, `readable_wrong` | counts |

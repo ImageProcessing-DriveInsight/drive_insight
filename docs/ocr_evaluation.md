@@ -5,11 +5,12 @@
 `eval_ocr(results, labels)` scores one condition. `python -m src.eval.ocr` scores every
 `results/ocr/<cond>.csv` and writes `results/ocr/ocr_summary.csv`.
 
-## Plate label format (proposal)
+## Plate label format
 
-Until the team label schema is fixed, plates are read from JSON files in `data/labels/`
-that map each frame file name to its plates. `text: null` means the plate is not readable by eye.
-A frame with no plate is an empty list.
+Plates are read from JSON files in `data/labels/` that map each frame file name to its plates.
+B's label tool writes this format: `python -m tools.b_labels export` turns the filled
+`data/annotations/scenes.json` into `data/labels/plates.json`.
+`text: null` means the plate is not readable by eye. A frame with no plate is an empty list.
 
 ```json
 {
@@ -21,15 +22,24 @@ A frame with no plate is an empty list.
 }
 ```
 
-When the real schema arrives, only `load_labels` in `src/eval/ocr.py` needs to change.
+US plates (frames listed in `data/plate_countries.json`, see
+[US plates](plate_recognition.md#us-plates)) are written in upper-case letters and digits, without
+spaces or dashes, e.g. `"7ABC123"`.
 
 ## Matching
 
-Per frame, predicted and labeled plates are paired one-to-one with IoU ≥ 0.5, highest IoU first.
+Per frame, predicted and labeled plates are paired one-to-one. A pair qualifies when the boxes
+overlap by at least half of the smaller box (`overlap` ≥ 0.5); qualifying pairs are taken highest
+IoU first, so the box closest in size wins.
+
+Plain IoU ≥ 0.5 was used before. In an end-to-end run on 10 sample frames, 4 plates in the
+fixed condition read the same text as in the original but had a tighter or looser box
+(IoU 0.07–0.32) and were counted as missed. The detection rate then measured how tight the box
+was, not whether the plate was found.
 
 ## Metrics
 
-Readable labeled plates (`text` is not null):
+Readable standard labeled plates (`text` is not null and is a standard plate):
 
 | Metric | Definition |
 | --- | --- |
@@ -45,13 +55,34 @@ Unreadable labeled plates are left out of the rates above:
 | `unreadable_labels` | count |
 | `overconfident` | judged readable anyway (would show made-up characters) |
 
+Labels that are not standard plates are left out of the rates too. A standard plate is what the
+judge can call readable ([status rules](plate_recognition.md)): plate characters only, with an optional
+region name. Carmaker advertising plates (123케4567, 12차3456), military and diplomatic plates are
+real, but a read of them can never be right, so they would always count as wrong.
+A label is checked against the standard format of its frame's country: on a US frame, a
+letters-only vanity plate (`GOBEARS`) is not standard, and a US plate on a Korean frame never is.
+
+| Metric | Definition |
+| --- | --- |
+| `nonstandard_labels` | count |
+| `readable_wrong` | also counts a readable answer on one of these |
+
 Also: `frames` (labeled frames), `plates`, `missing_frames` (labeled but not in the CSV).
-Rates are empty when there is no readable labeled plate.
+Rates are empty when there is no readable standard labeled plate.
 
 `frame_char_accuracy(results, labels)` gives the mean char accuracy per frame for the
-condition comparison (C-11). Frames without a readable labeled plate get `None`.
+condition comparison (C-11). Frames without a readable standard labeled plate get `None`.
+
+## Clear reference (#79)
+
+`results/ocr/clear.csv` is OCR on the clear frames the synthetic fog clips were made from
+(`python -m src.plate.run clear`). `python -m src.eval.ocr` adds a `clear` row after the three
+conditions and scores it only on the labeled frames in that file (`eval_conditions`): frames of
+other conditions have no clear frame and would otherwise count as missed plates. On a set of only
+synthetic fog frames, `clear` and the conditions cover the same plates.
 
 ## Checked by hand
 
 `tests/test_ocr_eval.py` has three cases worked out by hand in the docstrings:
 mixed reads with one overconfident answer, a missed box with a wrong read, and one-to-one matching.
+More tests cover tighter and looser boxes, the closest box winning, and non-standard labels.

@@ -1,15 +1,22 @@
 """OCR evaluation against plate labels (C-09).
 
-Plate label format (proposed until the team label schema is fixed): a JSON
-object mapping each frame file name to its plates. A folder of such files is
-merged. text null means the plate is not readable by eye.
+Plate label format (what `python -m tools.b_labels export` writes to
+data/labels/plates.json): a JSON object mapping each frame file name to its
+plates. A folder of such files is merged. text null means the plate is not
+readable by eye.
 
     {"fog_01_3500.png": [{"bbox": [x, y, w, h], "text": "12가3456"},
                          {"bbox": [x, y, w, h], "text": null}],
      "fog_01_7000.png": []}
 
+A US plate (frames listed in data/plate_countries.json, see src.plate.country) is written in
+upper-case letters and digits without spaces, e.g. "7ABC123".
+
+The clear reference (results/ocr/clear.csv, #79) is scored only on its own frames: only the
+synthetic fog frames have a clear frame.
+
 Usage:
-    python -m src.eval.ocr [--labels data/labels] [--results results]
+    python -m src.eval.ocr [--labels data/labels] [--results results] [--countries FILE]
 """
 
 import argparse
@@ -17,19 +24,34 @@ import csv
 import json
 from pathlib import Path
 
+from src.plate.country import country_of, load_countries
+from src.plate.judge import is_standard as plate_format_ok
+
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("orig", "fixed", "adaptive")
-IOU_MATCH = 0.5
+REFERENCE = "clear"  # clear frames of the synthetic fog clips (src.plate.run clear)
+MATCH_OVERLAP = 0.5  # share of the smaller box that must overlap
 OCR_METRICS = ["detection_rate", "exact_match", "char_accuracy", "overconfident"]
-SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", *OCR_METRICS, "readable_wrong", "missing_frames"]
+SUMMARY_FIELDS = ["condition", "frames", "plates", "unreadable_labels", "nonstandard_labels", *OCR_METRICS,
+                  "readable_wrong", "missing_frames"]
 
 
-def iou(a, b):  # (x, y, w, h)
+def intersection(a, b):  # (x, y, w, h)
     ix = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
     iy = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
-    inter = ix * iy
+    return ix * iy
+
+
+def iou(a, b):
+    inter = intersection(a, b)
     union = a[2] * a[3] + b[2] * b[3] - inter
     return inter / union if union > 0 else 0.0
+
+
+def overlap(a, b):
+    """Intersection over the smaller box: 1.0 when one box lies inside the other."""
+    smaller = min(a[2] * a[3], b[2] * b[3])
+    return intersection(a, b) / smaller if smaller > 0 else 0.0
 
 
 def edit_distance(a, b):  # Levenshtein
@@ -47,6 +69,20 @@ def char_accuracy(pred, label):
 
 def frame_key(name):
     return Path(str(name)).stem  # "x.png" and "x" are the same frame
+
+
+def is_standard(text, country="kr"):
+    """True for a plate text the judge can call readable (see src.plate.judge).
+
+    Carmaker advertising plates (123케4567), military and diplomatic plates, and US vanity
+    plates are real but use other characters or formats, so a read of them can never be right.
+    """
+    return plate_format_ok(text, country)
+
+
+def countries_of(countries):
+    """Plate country file or {country: [patterns]} dict -> dict; None reads data/plate_countries.json."""
+    return countries if isinstance(countries, dict) else load_countries(countries)
 
 
 def load_labels(labels):
@@ -83,34 +119,42 @@ def load_results(results):
 
 
 def match_frame(preds, labels):
-    """One-to-one matching with IoU >= IOU_MATCH, highest IoU first. Returns {label index: pred}."""
-    pairs = sorted(((iou(p["bbox"], lab["bbox"]), -i, -j) for j, p in enumerate(preds) for i, lab in enumerate(labels)),
-                   reverse=True)
+    """One-to-one matching. Returns {label index: pred}.
+
+    A pair qualifies when the boxes overlap by at least MATCH_OVERLAP of the smaller box, so a
+    box that is only tighter or looser than the label still counts. Qualifying pairs are taken
+    highest IoU first, so the box closest in size wins.
+    """
+    pairs = sorted(((iou(p["bbox"], lab["bbox"]), -i, -j) for j, p in enumerate(preds) for i, lab in enumerate(labels)
+                    if overlap(p["bbox"], lab["bbox"]) >= MATCH_OVERLAP), reverse=True)
     used_p, matched = set(), {}
-    for v, i, j in pairs:
+    for _, i, j in pairs:
         i, j = -i, -j
-        if v < IOU_MATCH:
-            break
         if i not in matched and j not in used_p:
             matched[i] = preds[j]
             used_p.add(j)
     return matched
 
 
-def score(results, labels):
+def score(results, labels, countries=None):
     """Returns (summary dict, {frame: mean char accuracy of its readable labels, or None})."""
-    preds, gold = load_results(results), load_labels(labels)
-    plates = detected = exact = unreadable = overconfident = readable_wrong = missing = 0
+    preds, gold, countries = load_results(results), load_labels(labels), countries_of(countries)
+    plates = detected = exact = unreadable = nonstandard = overconfident = readable_wrong = missing = 0
     accs, frames = [], {}
     for frame, labs in gold.items():
         missing += frame not in preds
         matched = match_frame(preds.get(frame, []), labs)
+        country = country_of(frame, countries)
         frame_accs = []
         for i, lab in enumerate(labs):
             p = matched.get(i)
             if lab["text"] is None:  # not readable by eye: only check for confident answers
                 unreadable += 1
                 overconfident += p is not None and p["status"] == "readable"
+                continue
+            if not is_standard(lab["text"], country):  # a readable answer here is always wrong
+                nonstandard += 1
+                readable_wrong += p is not None and p["status"] == "readable"
                 continue
             plates += 1
             detected += p is not None
@@ -123,6 +167,7 @@ def score(results, labels):
         "frames": len(gold),
         "plates": plates,
         "unreadable_labels": unreadable,
+        "nonstandard_labels": nonstandard,
         "detection_rate": detected / plates if plates else None,
         "exact_match": exact / plates if plates else None,
         "char_accuracy": sum(accs) / plates if plates else None,
@@ -133,51 +178,74 @@ def score(results, labels):
     return summary, frames
 
 
-def eval_ocr(results, labels) -> dict:
+def eval_ocr(results, labels, countries=None) -> dict:
     """Score one condition's OCR results.
 
     Args:
         results: path to results/ocr/<cond>.csv, or its rows as dicts.
         labels: dict, JSON file or folder in the plate label format above.
+        countries: plate country file or {country: [patterns]} (see src.plate.country);
+            None reads data/plate_countries.json. A label is checked against its country's format.
 
     Returns:
-        {"frames", "plates", "unreadable_labels", "detection_rate", "exact_match",
-         "char_accuracy", "overconfident", "readable_wrong", "missing_frames"}.
+        {"frames", "plates", "unreadable_labels", "nonstandard_labels", "detection_rate",
+         "exact_match", "char_accuracy", "overconfident", "readable_wrong", "missing_frames"}.
         Rates are None when there is no readable labeled plate.
         Labels with text None are left out of the three rates; "overconfident"
-        counts those that were read as readable.
+        counts those that were read as readable. Labels that are not standard plates
+        (is_standard) are left out too; a readable answer on one counts as readable_wrong.
     """
-    return score(results, labels)[0]
+    return score(results, labels, countries)[0]
 
 
-def frame_char_accuracy(results, labels) -> dict:
-    """{frame: mean char accuracy of its readable labeled plates, or None if it has none}."""
-    return score(results, labels)[1]
+def frame_char_accuracy(results, labels, countries=None) -> dict:
+    """{frame: mean char accuracy of its readable standard labeled plates, or None if it has none}."""
+    return score(results, labels, countries)[1]
 
 
-def plate_details(results, labels) -> dict:
-    """{frame: [{"label", "text", "status", "crop_path", "char_acc"}]}, one entry per readable labeled plate.
+def plate_details(results, labels, countries=None) -> dict:
+    """{frame: [{"label", "label_bbox", "text", "status", "crop_path", "char_acc"}]}, one entry per readable
+    standard labeled plate.
 
     A missed plate has text, status and crop_path None and char_acc 0. Frames missing from the
     results are left out; frames without a readable labeled plate map to [].
     The mean char_acc of a frame equals frame_char_accuracy.
     """
-    preds, gold = load_results(results), load_labels(labels)
+    preds, gold, countries = load_results(results), load_labels(labels), countries_of(countries)
     out = {}
     for frame, labs in gold.items():
         if frame not in preds:
             continue
         matched = match_frame(preds[frame], labs)
+        country = country_of(frame, countries)
         plates = []
         for i, lab in enumerate(labs):
-            if lab["text"] is None:
+            if lab["text"] is None or not is_standard(lab["text"], country):
                 continue
             p = matched.get(i) or {}
-            plates.append({"label": lab["text"], "text": p.get("text"), "status": p.get("status"),
-                           "crop_path": p.get("crop_path"),
+            plates.append({"label": lab["text"], "label_bbox": lab["bbox"], "text": p.get("text"),
+                           "status": p.get("status"), "crop_path": p.get("crop_path"),
                            "char_acc": char_accuracy(p.get("text"), lab["text"]) if p else 0.0})
         out[frame] = plates
     return out
+
+
+def own_frames(results, labels):
+    """The labels of the frames in results only."""
+    frames = set(load_results(results))
+    return {f: plates for f, plates in load_labels(labels).items() if f in frames}
+
+
+def eval_conditions(results_dir, labels, countries=None) -> list[dict]:
+    """[{"condition", **eval_ocr}] for each results_dir/ocr/<cond>.csv found: orig, fixed and
+    adaptive on all labels, then the clear reference on the labels of its own frames."""
+    rows = []
+    for cond in (*CONDITIONS, REFERENCE):
+        path = Path(results_dir) / "ocr" / f"{cond}.csv"
+        if path.exists():
+            labs = own_frames(path, labels) if cond == REFERENCE else labels
+            rows.append({"condition": cond, **eval_ocr(path, labs, countries)})
+    return rows
 
 
 def write_summary(rows, path):
@@ -195,12 +263,9 @@ def main():
     ap = argparse.ArgumentParser(description="Score results/ocr/<cond>.csv against plate labels.")
     ap.add_argument("--labels", type=Path, default=ROOT / "data" / "labels")
     ap.add_argument("--results", type=Path, default=ROOT / "results")
+    ap.add_argument("--countries", type=Path, help="plate country of each frame, default: data/plate_countries.json")
     args = ap.parse_args()
-    rows = []
-    for cond in CONDITIONS:
-        path = args.results / "ocr" / f"{cond}.csv"
-        if path.exists():
-            rows.append({"condition": cond, **eval_ocr(path, args.labels)})
+    rows = eval_conditions(args.results, args.labels, load_countries(args.countries))
     if not rows:
         raise SystemExit(f"no {args.results / 'ocr'}/<cond>.csv found")
     out = write_summary(rows, args.results / "ocr" / "ocr_summary.csv")

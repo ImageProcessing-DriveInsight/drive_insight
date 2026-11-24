@@ -1,5 +1,5 @@
-from .aggregate import aggregate
-from .compare import compare, write_compare
-from .ocr import eval_ocr, frame_char_accuracy, plate_details
+"""OCR evaluation (ocr), aggregation (aggregate) and condition comparison (compare).
 
-__all__ = ["aggregate", "compare", "eval_ocr", "frame_char_accuracy", "plate_details", "write_compare"]
+Import the submodules directly, e.g. `from src.eval.ocr import eval_ocr`. The package
+does not import them itself, so `python -m src.eval.<module>` runs without a RuntimeWarning.
+"""

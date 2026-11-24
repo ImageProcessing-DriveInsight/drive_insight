@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.dip import bgr_to_ycrcb, gamma, hist_eq, ycrcb_to_bgr
+from src.dip import bgr_to_ycrcb, gamma, gaussian, hist_eq, median, unsharp, ycrcb_to_bgr
 
 
 def sample_frame():
@@ -108,3 +108,166 @@ def test_opencv_histogram_reference():
     assert error(hist_eq(img), ycrcb_to_bgr(ycrcb)).mean() <= 1
     ramp = gray(np.random.default_rng(3).integers(25, 180, (80, 90), dtype=np.uint8))
     np.testing.assert_array_equal(hist_eq(ramp)[..., 0], cv2.equalizeHist(ramp[..., 0]))
+
+
+@pytest.mark.parametrize("ksize", [3, 5, 7, 9])
+@pytest.mark.parametrize("sigma", [0.1, 0.7, 1.5, 3.0, 100.0])
+@pytest.mark.parametrize("shape", [(17, 23, 3), (1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_gaussian_reference(ksize, sigma, shape):
+    import cv2
+    img = np.random.default_rng(29).integers(0, 256, shape, dtype=np.uint8)
+    expected = cv2.GaussianBlur(img, (ksize, ksize), sigma, borderType=cv2.BORDER_REFLECT_101)
+    assert error(gaussian(img, ksize, sigma), expected).max() <= 1
+
+
+@pytest.mark.parametrize("value", [0, 71, 255])
+def test_gaussian_constant_and_input_preservation(value):
+    img = np.full((5, 7, 3), value, dtype=np.uint8)[:, ::-1]
+    before = img.copy()
+    out = gaussian(img, 9, 1.2)
+    np.testing.assert_array_equal(out, before)
+    np.testing.assert_array_equal(img, before)
+    assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+
+
+@pytest.mark.parametrize("ksize", [0, 1, 2, 4, 11, 3.0, True, None, '3'])
+def test_gaussian_invalid_size(ksize):
+    with pytest.raises(ValueError):
+        gaussian(sample_frame(), ksize, 1)
+
+
+@pytest.mark.parametrize("sigma", [0, -1, np.nan, np.inf, True, None, '1', 1j])
+def test_gaussian_invalid_sigma(sigma):
+    with pytest.raises(ValueError):
+        gaussian(sample_frame(), 3, sigma)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_gaussian_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        gaussian(bad, 3, 1)
+
+
+def test_gaussian_channel_independence_and_strides():
+    img = np.zeros((13, 17, 3), np.uint8)
+    img[6, 8, 0] = 255
+    before = img.copy()
+    out = gaussian(img[:, ::-1], np.int64(5), np.float64(1.2))
+    assert out[..., 0].max() > 0
+    assert not out[..., 1:].any()
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("ksize", [3, 5])
+@pytest.mark.parametrize("shape", [(70, 23, 3), (1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_median_reference(ksize, shape):
+    import cv2
+    img = np.random.default_rng(30).integers(0, 256, shape, dtype=np.uint8)
+    np.testing.assert_array_equal(median(img, ksize), cv2.medianBlur(img, ksize))
+
+
+@pytest.mark.parametrize("ksize", [3, 5])
+def test_median_removes_salt_pepper_and_preserves_channels(ksize):
+    img = np.tile(np.array([40, 100, 160], np.uint8), (11, 13, 1))
+    expected = img.copy()
+    img[3, 3] = 0
+    img[7, 8] = 255
+    before = img.copy()
+    np.testing.assert_array_equal(median(img[:, ::-1], ksize), expected[:, ::-1])
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("value", [0, 83, 255])
+def test_median_constant(value):
+    img = np.full((3, 7, 3), value, np.uint8)
+    out = median(img, np.int64(5))
+    np.testing.assert_array_equal(out, img)
+    assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+
+
+@pytest.mark.parametrize("ksize", [0, 1, 2, 4, 7, 9, 3.0, True, None, '3'])
+def test_median_invalid_size(ksize):
+    with pytest.raises(ValueError):
+        median(sample_frame(), ksize)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_median_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        median(bad, 3)
+
+
+@pytest.mark.parametrize("workers", [1, 4])
+@pytest.mark.parametrize("ksize", [3, 5])
+def test_median_serial_parallel_blocks_are_exact(workers, ksize, monkeypatch):
+    import cv2
+    import src.dip.ops as ops
+    monkeypatch.setattr(ops.os, "cpu_count", lambda: workers)
+    monkeypatch.setattr(ops, "_MEDIAN_PARALLEL_MIN_PIXELS", 1)
+    img = np.random.default_rng(50).integers(0, 256, (131, 19, 3), dtype=np.uint8)[:, ::-1]
+    before = img.copy()
+    img.flags.writeable = False
+    np.testing.assert_array_equal(median(img, ksize), cv2.medianBlur(img, ksize))
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("sigma,ksize", [(0.1, 3), (0.5, 5), (1, 7), (2, 9), (100, 9)])
+@pytest.mark.parametrize("amount,threshold", [(0.5, 0), (np.float32(0.8), 5), (1.2, 10), (3, 50)])
+def test_unsharp_reference(sigma, ksize, amount, threshold):
+    import cv2
+    img = sample_frame()
+    blur = cv2.GaussianBlur(img, (ksize, ksize), sigma, borderType=cv2.BORDER_REFLECT_101)
+    difference = img.astype(float) - blur.astype(float)
+    difference[np.abs(difference) < threshold] = 0
+    expected = np.clip(np.rint(img + amount * difference), 0, 255).astype(np.uint8)
+    # Fixed-point kernels are checked separately against the Gaussian reference.
+    np.testing.assert_array_equal(unsharp(img, amount, sigma, threshold), expected)
+
+
+@pytest.mark.parametrize("shape", [(1, 1, 3), (1, 7, 3), (9, 1, 3), (2, 2, 3)])
+def test_unsharp_tiny_frames(shape):
+    img = np.full(shape, 99, np.uint8)
+    np.testing.assert_array_equal(unsharp(img, 2, 1, 0), img)
+
+
+def test_unsharp_zero_amount_and_high_threshold_are_exact():
+    img = sample_frame()[:, ::-2]
+    before = img.copy()
+    for out in (unsharp(img, 0, 1, 0), unsharp(img, 3, 1, 256)):
+        np.testing.assert_array_equal(out, before)
+        assert out.dtype == np.uint8 and not np.shares_memory(img, out)
+    np.testing.assert_array_equal(img, before)
+
+
+def test_unsharp_threshold_equality_is_applied_and_output_clips():
+    # Derive an exact boundary from the green impulse; red/blue force saturation.
+    img = np.full((5, 5, 3), 100, np.uint8)
+    img[2, 2] = [0, 110, 255]
+    before = img.copy()
+    difference = img.astype(float) - gaussian(img, 7, 1).astype(float)
+    threshold = abs(difference[2, 2, 1])
+    out = unsharp(img, 10, 1, threshold)
+    assert out[2, 2, 0] == 0 and out[2, 2, 2] == 255
+    assert out[2, 2, 1] > img[2, 2, 1]
+    unchanged = abs(difference) < threshold
+    np.testing.assert_array_equal(out[unchanged], img[unchanged])
+    np.testing.assert_array_equal(img, before)
+
+
+@pytest.mark.parametrize("name,value", [(name, value) for name in ('amount', 'threshold')
+    for value in (-1, np.nan, np.inf, True, None, '1', 1j)] +
+    [('sigma', value) for value in (0, -1, np.nan, np.inf, True, None, '1', 1j)])
+def test_unsharp_invalid_parameters(name, value):
+    params = dict(amount=1, sigma=1, threshold=0)
+    params[name] = value
+    with pytest.raises(ValueError):
+        unsharp(sample_frame(), **params)
+
+
+@pytest.mark.parametrize("bad", [None, np.zeros((2, 3, 3)), np.zeros((0, 3, 3), np.uint8),
+                                 np.zeros((3, 3), np.uint8)])
+def test_unsharp_invalid_frame(bad):
+    with pytest.raises(ValueError):
+        unsharp(bad, 1, 1, 0)

@@ -1,9 +1,11 @@
+from types import SimpleNamespace
+
 import cv2
 import numpy as np
 import pytest
 
-from src.plate.candidates import box_sums, detect_plate_candidates, grow_box, integral, iou
-from src.plate.detect import WEIGHTS, detect_vehicles
+from src.plate.candidates import TOP_K, box_sums, detect_plate_candidates, grow_box, integral, iou
+from src.plate.detect import WEIGHTS, detect_vehicles, drop_duplicates, own_car
 from src.plate.imgutil import to_gray
 
 PLATE = (250, 330, 110, 24)  # (x, y, w, h), about 4.5:1 like a long one-line plate
@@ -36,6 +38,19 @@ def test_candidates_without_vehicles_search_whole_frame():
     for x, y, w, h in cands:
         assert x >= 0 and y >= 0 and x + w <= img.shape[1] and y + h <= img.shape[0]
     assert any(iou(c, PLATE) >= 0.5 for c in cands)
+
+
+def test_candidates_keep_four_per_vehicle():
+    """Five plate-like patches on one car: four candidates are kept (#71). In fog a headlight and
+    grille can outscore the plate, and in the rehearsal the plate was the 4th candidate."""
+    img = np.full((480, 640, 3), 90, dtype=np.uint8)
+    img[100:400, 100:540] = 60
+    for x, y in ((120, 230), (330, 230), (120, 300), (330, 300), (225, 360)):
+        img[y:y + 20, x:x + 90] = 230
+        for cx in range(x + 6, x + 84, 11):
+            img[y + 3:y + 17, cx:cx + 4] = 20
+    assert TOP_K == 4
+    assert len(detect_plate_candidates(img, VEHICLE)) == TOP_K
 
 
 def test_candidates_reject_bad_input():
@@ -81,3 +96,65 @@ def test_detect_vehicles_on_sample_image():
     assert areas == sorted(areas, reverse=True)
     with pytest.raises(ValueError):
         detect_vehicles(np.zeros((10, 10), np.uint8))
+
+
+class FakeYolo:
+    """Stands in for YOLO: predict returns the given xyxy boxes (cars at conf 0.5 unless given), with optional masks."""
+
+    def __init__(self, boxes, masks=None, cls=None, conf=None):
+        self.boxes, self.masks = np.array(boxes, float), masks
+        n = len(self.boxes)
+        self.cls = np.full(n, 2.0) if cls is None else np.array(cls, float)
+        self.conf = np.full(n, 0.5) if conf is None else np.array(conf, float)
+
+    def predict(self, img, **kwargs):
+        boxes = SimpleNamespace(xyxy=self.boxes, cls=self.cls, conf=self.conf)
+        masks = None if self.masks is None else SimpleNamespace(
+            data=SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: self.masks)))
+        return [SimpleNamespace(boxes=boxes, masks=masks)]
+
+
+def test_own_car():
+    assert own_car((3, 681, 1735, 382), 1920, 1080)  # a dashboard box from an own clip
+    assert not own_car((500, 681, 900, 382), 1920, 1080)  # not wide enough
+    assert not own_car((3, 400, 1735, 400), 1920, 1080)  # wide, but ends above the bottom band
+    assert own_car((928, 824, 192, 74), 1920, 1080)  # a car reflected on the dashboard
+    assert not own_car((700, 690, 300, 260), 1920, 1080)  # a near car: starts above the bottom quarter
+
+
+def test_detect_vehicles_drops_the_camera_car(monkeypatch):
+    import src.plate.detect as detect
+
+    model = FakeYolo([[3, 681, 1738, 1063], [700, 500, 1000, 760], [928, 824, 1120, 898]])  # dashboard, car, reflection
+    monkeypatch.setattr(detect, "_vehicle_model", lambda: model)
+    assert [v["bbox"] for v in detect_vehicles(np.zeros((1080, 1920, 3), np.uint8))] == [(700, 500, 300, 260)]
+
+
+def test_drop_duplicates_keeps_the_most_confident():
+    car, truck = {"bbox": (1144, 513, 326, 253), "cls": "car", "conf": 0.6}, {"bbox": (1147, 514, 323, 251), "cls": "truck", "conf": 0.8}
+    near = {"bbox": (1300, 513, 326, 253), "cls": "car", "conf": 0.5}  # IoU 0.35 with car: another vehicle
+    assert drop_duplicates([car, truck, near]) == [truck, near]
+    assert drop_duplicates([car, near], threshold=0.3) == [car]
+    assert drop_duplicates([]) == []
+
+
+def test_detect_vehicles_keeps_one_box_per_vehicle(monkeypatch):
+    """A vehicle seen as car and truck (one own clip, #88): one box, the more confident truck."""
+    import src.plate.detect as detect
+
+    model = FakeYolo([[1144, 513, 1470, 766], [1147, 514, 1470, 765], [513, 566, 574, 608]],
+                     cls=[2, 7, 2], conf=[0.6, 0.8, 0.7])
+    monkeypatch.setattr(detect, "_vehicle_model", lambda: model)
+    vehicles = detect_vehicles(np.zeros((1080, 1920, 3), np.uint8))
+    assert [(v["bbox"], v["cls"]) for v in vehicles] == [((1147, 514, 323, 251), "truck"), ((513, 566, 61, 42), "car")]
+
+
+def test_fog_masks_drop_the_camera_car(monkeypatch):
+    import tools.synth_fog as synth_fog
+
+    masks = np.zeros((2, 108, 192), np.float32)
+    masks[0, 68:106, 0:174] = 1  # dashboard
+    masks[1, 50:76, 70:100] = 1  # car ahead
+    monkeypatch.setattr(synth_fog, "_seg_model", FakeYolo([[0, 68, 174, 106], [70, 50, 100, 76]], masks))
+    kept = synth_fog.vehicle_masks(np.zeros((108, 192, 3), np.uint8))
+    assert len(kept) == 1 and kept[0][60, 85] and not kept[0][90, 50]

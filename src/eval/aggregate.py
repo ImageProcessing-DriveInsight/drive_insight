@@ -4,7 +4,10 @@ Reads, under results_dir:
     ocr/ocr_summary.csv   OCR metrics per condition (python -m src.eval.ocr, C-09),
                           or ocr/<cond>.csv scored against labels when labels are given
     vlm/score.csv         VLM scores (D-08), one row per condition or per condition and clip
-    timing.csv            step times per frame (D-04)
+    timing.csv            step times per frame (D-04), and/or <cond>/timing.csv per condition
+    ocr/<cond>.csv, params/<cond>.json
+                          step times of a condition without a timing file: ocr_ms of the OCR run
+                          (C-08) and enhance_ms of the fixed (A) or adaptive (B) batch
 and writes summary.csv with one row per condition. A missing source leaves its columns empty.
 
 Usage:
@@ -13,9 +16,10 @@ Usage:
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
-from .ocr import CONDITIONS, eval_ocr
+from .ocr import CONDITIONS, eval_conditions
 
 ROOT = Path(__file__).resolve().parents[2]
 OCR_COLUMNS = ["plates", "detection_rate", "exact_match", "char_accuracy", "overconfident", "readable_wrong"]
@@ -39,7 +43,11 @@ def mean(values):
     return sum(values) / len(values) if values else None
 
 
-def read_rows(path):
+def read_rows(path, condition=None):
+    """Rows of a CSV with a condition column; [] if the file is missing or empty.
+
+    With condition given, the column may be missing and empty cells take that condition.
+    """
     path = Path(path)
     if not path.exists():
         return []
@@ -47,9 +55,13 @@ def read_rows(path):
         reader = csv.DictReader(f)
         if reader.fieldnames is None:  # empty file
             return []
-        if "condition" not in reader.fieldnames:
+        if "condition" not in reader.fieldnames and condition is None:
             raise ValueError(f"{path}: needs a 'condition' column")
-        return list(reader)
+        rows = list(reader)
+    if condition is not None:
+        for r in rows:
+            r["condition"] = (r.get("condition") or "").strip() or condition
+    return rows
 
 
 def by_condition(rows):
@@ -63,8 +75,7 @@ def ocr_metrics(results_dir, labels=None):
     """{cond: OCR metrics}. Scores ocr/<cond>.csv when labels are given, else reads ocr/ocr_summary.csv."""
     ocr_dir = Path(results_dir) / "ocr"
     if labels is not None:
-        return {cond: eval_ocr(ocr_dir / f"{cond}.csv", labels)
-                for cond in CONDITIONS if (ocr_dir / f"{cond}.csv").exists()}
+        return {r.pop("condition"): r for r in eval_conditions(results_dir, labels)}
     return {cond: {k: num(rs[0].get(k)) for k in OCR_COLUMNS}
             for cond, rs in by_condition(read_rows(ocr_dir / "ocr_summary.csv")).items()}
 
@@ -92,18 +103,63 @@ def vlm_metrics(path):
     return out
 
 
-def time_metrics(path):
+def timing_rows(results_dir):
+    """Rows of timing.csv and of every <cond>/timing.csv under results_dir.
+
+    D's runner (D-04) writes one file per condition folder; a row there without a condition
+    takes the folder name. The same condition and frame twice is an error, so no frame counts twice.
+    """
+    results_dir = Path(results_dir)
+    rows = read_rows(results_dir / "timing.csv")
+    for path in sorted(results_dir.glob("*/timing.csv")):
+        rows += read_rows(path, condition=path.parent.name)
+    seen = set()
+    for r in rows:
+        key = (r["condition"].strip(), (r.get("frame") or "").strip())
+        if key[1] and key in seen:
+            raise ValueError(f"timing of {key[1]} in {key[0]} appears twice under {results_dir}")
+        seen.add(key)
+    return rows
+
+
+def log_rows(results_dir, conds):
+    """Step times from the stage logs, for conditions without a timing file.
+
+    ocr_ms comes from ocr/<cond>.csv (once per frame; every plate row of a frame has the same
+    value) and enhance_ms from params/<cond>.json, the per-frame log of A's fixed batch and B's
+    adaptive batch. orig has no enhancement step. total_ms stays empty: the VLM step is not in
+    these logs, and D's runner (D-04) measures the whole frame.
+    """
+    results_dir, rows = Path(results_dir), []
+    for cond in conds:
+        path = results_dir / "ocr" / f"{cond}.csv"
+        if not path.exists():
+            continue
+        params = results_dir / "params" / f"{cond}.json"
+        enhance = json.loads(params.read_text(encoding="utf-8")) if params.exists() else {}
+        frames = {}
+        for r in read_rows(path, condition=cond):
+            frames.setdefault(r["frame"], r.get("ocr_ms"))
+        rows += [{"condition": cond, "frame": frame, "ocr_ms": ms, "enhance_ms": (enhance.get(frame) or {}).get("enhance_ms")}
+                 for frame, ms in frames.items()]
+    return rows
+
+
+def time_metrics(rows):
     """{cond: mean ms per frame for each step}. Empty cells are skipped, e.g. vlm_ms on frames without a VLM call."""
     return {cond: {k: mean(num(r.get(k)) for r in rs) for k in TIME_COLUMNS}
-            for cond, rs in by_condition(read_rows(path)).items()}
+            for cond, rs in by_condition(rows).items()}
 
 
 def summarize(results_dir, labels=None):
     """Rows of summary.csv as dicts: orig, fixed, adaptive first, then any other condition found."""
     results_dir = Path(results_dir)
+    timing = timing_rows(results_dir)
+    timed = {r["condition"].strip() for r in timing}
+    timing += log_rows(results_dir, [c for c in CONDITIONS if c not in timed])
     sources = [ocr_metrics(results_dir, labels),
                vlm_metrics(results_dir / "vlm" / "score.csv"),
-               time_metrics(results_dir / "timing.csv")]
+               time_metrics(timing)]
     found = {cond for s in sources for cond in s}
     order = [c for c in CONDITIONS if c in found] + sorted(found - set(CONDITIONS))
     rows = []
@@ -128,7 +184,7 @@ def aggregate(results_dir, labels=None) -> Path:
     """Write <results_dir>/summary.csv with one row per condition.
 
     Args:
-        results_dir: folder with ocr/, vlm/score.csv and timing.csv.
+        results_dir: folder with ocr/, vlm/score.csv and timing.csv or <cond>/timing.csv.
         labels: optional plate labels (see src.eval.ocr). If given, ocr/<cond>.csv is
             scored again instead of reading ocr/ocr_summary.csv.
 
