@@ -8,32 +8,32 @@ DriveInsight는 악조건(야간, 비, 안개, 역광, 터널)에서 찍힌 블�
 | 조건 | 뜻 |
 | --- | --- |
 | `orig` | 원본 프레임 |
-| `fixed` | 고정 보정: 모든 프레임에 같은 파라미터 (A) |
-| `adaptive` | 적응형 보정: 화질을 재고 프레임마다 파라미터를 고름 (B) |
+| `fixed` | 고정 보정: 모든 프레임에 같은 파라미터 (h1gyeon9) |
+| `adaptive` | 적응형 보정: 화질을 재고 프레임마다 파라미터를 고름 (leojuho) |
 
-세 조건은 번호판 인식과 차량 검출(C), 시각 언어 모델(VLM)의 장면 요약(D)으로 비교합니다. 영상처리 연산은 팀이
+세 조건은 번호판 인식과 차량 검출(sangwon5579), 시각 언어 모델(VLM)의 장면 요약(callmeaein)으로 비교합니다. 영상처리 연산은 팀이
 NumPy로 직접 구현했고, 사전학습 모델은 차량 검출, 글자 인식, 장면 요약에만 씁니다
 ([사전학습 모델과 직접 구현](#사전학습-모델과-직접-구현) 참고).
 
 ```text
-클립 / 이미지 시퀀스 ──► 원본 PNG 프레임 (B) ──┬─► orig
-                                                ├─► 고정 보정 (A) ──────────────► fixed
-                                                └─► 화질 측정 → 규칙 → 연산 (B) ─► adaptive
-조건마다 ──► 차량 → 번호판 후보 → 크롭 전처리 → OCR → 상태 판정 (C)
-         ──► 장면 요약 (D)
-모든 조건 ──► 평가, 집계, 비교, 환경 조건별 결과 (C) ──► 리뷰 패키지 (B)
+클립 / 이미지 시퀀스 ──► 원본 PNG 프레임 (leojuho) ──┬─► orig
+                                                      ├─► 고정 보정 (h1gyeon9) ──────────────► fixed
+                                                      └─► 화질 측정 → 규칙 → 연산 (leojuho) ─► adaptive
+조건마다 ──► 차량 → 번호판 후보 → 크롭 전처리 → OCR → 상태 판정 (sangwon5579)
+         ──► 장면 요약 (callmeaein)
+모든 조건 ──► 평가, 집계, 비교, 환경 조건별 결과 (sangwon5579) ──► 리뷰 패키지 (leojuho)
 ```
 
 ## 팀과 모듈
 
 | 팀원 | 모듈 | 맡은 일 |
 | --- | --- | --- |
-| A | `src/dip/` | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), `apply_ops`, `fixed_enhance`, 고정 보정 일괄 처리, 야간 데이터 점검과 프레임 목록 |
-| B | `src/io/`, `src/adaptive/`, `src/package/` | 프레임·영상 입출력, 화질 측정, 규칙 기반 파라미터, `adaptive_enhance`, 평가 목록과 라벨, 리뷰 패키지, 민감도 실험 |
-| C | `src/plate/`, `src/eval/` | 차량·번호판 검출, 크롭 전처리, OCR과 상태 판정, OCR 평가, 집계, 비교, 차량 검출률, 환경 조건별 결과 |
-| D | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, 프로젝트 파일, 제출. 아직 머지 전(#38) |
+| [h1gyeon9](https://github.com/h1gyeon9) | `src/dip/` | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), `apply_ops`, `fixed_enhance`, 고정 보정 일괄 처리, 야간 데이터 점검과 프레임 목록 |
+| [leojuho](https://github.com/leojuho) | `src/io/`, `src/adaptive/`, `src/package/` | 프레임·영상 입출력, 화질 측정, 규칙 기반 파라미터, `adaptive_enhance`, 평가 목록과 라벨, 리뷰 패키지, 민감도 실험 |
+| [sangwon5579](https://github.com/sangwon5579) | `src/plate/`, `src/eval/` | 차량·번호판 검출, 크롭 전처리, OCR과 상태 판정, OCR 평가, 집계, 비교, 차량 검출률, 환경 조건별 결과 |
+| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, 프로젝트 파일, 제출. 아직 머지 전(#38) |
 
-인터페이스, 폴더, 일정은 [팀 계획](docs/plan/team_plan.ko.md), 기능과 진행 상태는 [기능 명세](docs/plan/feature_spec.ko.md),
+인터페이스, 폴더, 일정은 [팀 계획](docs/plan/team_plan.ko.md)(팀원을 위 순서대로 A, B, C, D로 부름), 기능과 진행 상태는 [기능 명세](docs/plan/feature_spec.ko.md),
 전체 문서 목록은 [docs/](docs/README.ko.md)에 있습니다.
 
 ## 설치
@@ -50,7 +50,7 @@ python -m pip install -r requirements-plate.txt -r requirements-b.txt -r require
   고정하는데, OpenCV 배포판이 섞이면 `cv2`가 깨질 수 있습니다.
 - `requirements-plate.txt`의 `pandas`, `chardet` 버전은 최신 빌드가 막힌 팀원 PC 한 대 때문에 고정한 것입니다.
 - 모델 가중치는 처음 실행할 때 받아집니다. YOLO는 `weights/`(git 제외), PaddleOCR은 `~/.paddlex/official_models/`입니다.
-- B의 문서는 Windows에서 `python` 대신 `py`를 씁니다. 둘 다 됩니다.
+- leojuho의 문서는 Windows에서 `python` 대신 `py`를 씁니다. 둘 다 됩니다.
 
 ## 데이터
 
@@ -59,11 +59,11 @@ python -m pip install -r requirements-plate.txt -r requirements-b.txt -r require
 
 ```text
 data/clips/                        원본 영상 (수정하지 않음)
-data/eval_set.csv                  clip, timestamp_ms, condition, source, license (팀원 목록을 B가 합침)
+data/eval_set.csv                  clip, timestamp_ms, condition, source, license (팀원 목록을 leojuho가 합침)
 data/frames/orig/ fixed/ adaptive/ 세 조건 폴더에 같은 <clip>_<ms>.png
-data/frames/clear/                 합성 안개를 만든 맑은 프레임 (C의 안개 클립만)
-data/annotations/scenes.json       프레임별 라벨: 차량, 번호판, 사건 (B의 라벨 도구)
-data/annotations/aihub_vehicles.json  차량 검출률용으로 바꾼 AI Hub 차량 라벨 (C)
+data/frames/clear/                 합성 안개를 만든 맑은 프레임 (sangwon5579의 안개 클립만)
+data/annotations/scenes.json       프레임별 라벨: 차량, 번호판, 사건 (leojuho의 라벨 도구)
+data/annotations/aihub_vehicles.json  차량 검출률용으로 바꾼 AI Hub 차량 라벨 (sangwon5579)
 data/labels/plates.json            OCR 평가용 번호판 라벨 (scenes.json에서 내보냄)
 data/plate_countries.json          미국 번호판 프레임 (있을 때만)
 results/                           출력, 아래 참고
@@ -78,29 +78,29 @@ package/<clip>/                    리뷰 패키지
 
 | 단계 | 담당 | 명령 | 출력 |
 | --- | --- | --- | --- |
-| 1. 팀원 목록 합치기 | B | `python -m tools.prepare_data member_a.csv member_b.csv member_c.csv member_d.csv` | `data/eval_set.csv` |
-| 2. 원본 프레임 추출 | B | `python -m tools.b_cli extract` | `data/frames/orig/` |
-| 3. 라벨 | B, 각 담당 | `python -m tools.b_labels init`, `scenes.json` 채우기(초안: `python tools/label_draft.py draft`), `python -m tools.b_labels export --require-review` | `data/annotations/scenes.json`, `data/labels/plates.json` |
-| 3a. AI Hub 차량 라벨 | C | `python tools/aihub_vehicles.py <라벨 폴더> [--names names.csv]` | `data/annotations/aihub_vehicles.json` |
-| 4. 고정 보정 | A | `python -m src.dip.batch` | `data/frames/fixed/`, `results/params/fixed.json` |
-| 5. 적응형 보정 | B | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
-| 6. 번호판, 차량, 평가, 비교 | C | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
-| 7. 환경 조건별 결과 | C | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]` | `results/by_env/` |
-| 8. 장면 요약과 실행기 | D | 진행 중(#38) | `results/vlm/score.csv`, `results/timing.csv` |
-| 9. 리뷰 패키지 | B | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
+| 1. 팀원 목록 합치기 | leojuho | `python -m tools.prepare_data member_a.csv member_b.csv member_c.csv member_d.csv` | `data/eval_set.csv` |
+| 2. 원본 프레임 추출 | leojuho | `python -m tools.b_cli extract` | `data/frames/orig/` |
+| 3. 라벨 | leojuho, 각 담당 | `python -m tools.b_labels init`, `scenes.json` 채우기(초안: `python tools/label_draft.py draft`), `python -m tools.b_labels export --require-review` | `data/annotations/scenes.json`, `data/labels/plates.json` |
+| 3a. AI Hub 차량 라벨 | sangwon5579 | `python tools/aihub_vehicles.py <라벨 폴더> [--names names.csv]` | `data/annotations/aihub_vehicles.json` |
+| 4. 고정 보정 | h1gyeon9 | `python -m src.dip.batch` | `data/frames/fixed/`, `results/params/fixed.json` |
+| 5. 적응형 보정 | leojuho | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
+| 6. 번호판, 차량, 평가, 비교 | sangwon5579 | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
+| 7. 환경 조건별 결과 | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]` | `results/by_env/` |
+| 8. 장면 요약과 실행기 | callmeaein | 진행 중(#38) | `results/vlm/score.csv`, `results/timing.csv` |
+| 9. 리뷰 패키지 | leojuho | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
 
 그 밖의 도구:
 
 ```bash
 python -m tools.b_cli video data/clips/<clip>.mp4 --mode adaptive   # 보정 영상 (--mode fixed도 가능)
-python -m tools.sensitivity --scale 0.8 1.2 --labels data/labels    # B: 적응형 임계값 배율 실험
-python -m tools.audit_night_data --decode-images --output data/annotations/<report>.json   # A: 야간 데이터 점검
-python -m tools.select_night_frames                                 # A: 공통 기준으로 야간 프레임 목록
-python -m tools.verify_fixed_batch snapshot --snapshot data/annotations/fixed_orig_snapshot.json   # A: 일괄 처리 전
-python -m tools.verify_fixed_batch verify --snapshot data/annotations/fixed_orig_snapshot.json     # A: 일괄 처리 후
-python tools/synth_fog.py make <맑은 클립> <출력>                   # C: 맑은 날 영상으로 합성 안개
-python tools/pick_frames.py scan <클립>                             # C: 차량 크기로 타임스탬프 고르기
-python tools/compare_images.py --hide 2                             # C: 발표용 이미지, 번호판 뒤 두 글자 가림
+python -m tools.sensitivity --scale 0.8 1.2 --labels data/labels    # leojuho: 적응형 임계값 배율 실험
+python -m tools.audit_night_data --decode-images --output data/annotations/<report>.json   # h1gyeon9: 야간 데이터 점검
+python -m tools.select_night_frames                                 # h1gyeon9: 공통 기준으로 야간 프레임 목록
+python -m tools.verify_fixed_batch snapshot --snapshot data/annotations/fixed_orig_snapshot.json   # h1gyeon9: 일괄 처리 전
+python -m tools.verify_fixed_batch verify --snapshot data/annotations/fixed_orig_snapshot.json     # h1gyeon9: 일괄 처리 후
+python tools/synth_fog.py make <맑은 클립> <출력>                   # sangwon5579: 맑은 날 영상으로 합성 안개
+python tools/pick_frames.py scan <클립>                             # sangwon5579: 차량 크기로 타임스탬프 고르기
+python tools/compare_images.py --hide 2                             # sangwon5579: 발표용 이미지, 번호판 뒤 두 글자 가림
 ```
 
 ## 출력
@@ -129,23 +129,23 @@ python tools/compare_images.py --hide 2                             # C: 발표�
 - 이 프레임들에서는 적응형 규칙이 하나도 발동하지 않아 적응형이 원본과 같습니다.
 - 차량 검출률은 안개 0.54(폭 100 px 미만 차량은 0.12), 고정 보정 뒤 0.51입니다.
 
-야간, 비, 터널, 역광 결과는 통합 점검 3(11/24)과 D의 VLM 점수 뒤에 추가합니다.
+야간, 비, 터널, 역광 결과는 통합 점검 3(11/24)과 callmeaein의 VLM 점수 뒤에 추가합니다.
 
 ## 사전학습 모델과 직접 구현
 
 | 부분 | 사전학습 | 직접 구현 |
 | --- | --- | --- |
-| 영상 보정 (A) | – | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), 고정 파라미터 |
-| 적응형 보정 (B) | – | 밝기·대비·노이즈·선명도 측정, 규칙 기반 파라미터 선택 |
-| 프레임·영상 입출력 (B) | OpenCV(읽기·쓰기만) | 타임스탬프 추출, 출력 검사 |
-| 차량 검출 (C) | YOLOv8n, Ultralytics 8.4.208, COCO 가중치, AGPL-3.0 | 클래스·신뢰도 필터, 촬영 차량 필터(대시보드와 반사), 차량당 박스 하나 |
-| 번호판 검출 (C) | – | 후보 탐색: 수직 에지, 밝기, 적분 영상 기반 주변 대비, 박스 확장, NMS, 차량당 후보 4개 |
-| 크롭 전처리 (C) | – | 그레이 변환, 쌍선형 리사이즈, 대비 스트레칭, 극성 맞춤, 기울기 보정, Otsu |
-| OCR (C) | PaddleOCR 3.7.0, `korean` PP-OCRv5, Apache-2.0 | 줄 잇기, O/I 보정, 정규화. 미국 번호판은 번호 줄만 |
-| 상태 판정 (C) | – | 한국·미국 번호판 형식에 따른 `readable` / `uncertain` / `unreadable` 규칙 |
-| 평가 (C) | – | 짝짓기, 지표, 집계, 비교, 부호 검정, 환경 조건별 결과, 발표용 이미지 |
-| 장면 요약 (D) | VLM은 D가 채움(#38) | 프롬프트, 스키마, 주장 검사, 채점 |
-| 타임스탬프 고르기, 합성 안개 (C, 도구만) | YOLOv8n 박스, YOLOv8n-seg 마스크 | 가까운 차량 규칙, Koschmieder 안개 모델, A의 Gaussian으로 산란 흐림, 센서 노이즈 |
+| 영상 보정 (h1gyeon9) | – | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), 고정 파라미터 |
+| 적응형 보정 (leojuho) | – | 밝기·대비·노이즈·선명도 측정, 규칙 기반 파라미터 선택 |
+| 프레임·영상 입출력 (leojuho) | OpenCV(읽기·쓰기만) | 타임스탬프 추출, 출력 검사 |
+| 차량 검출 (sangwon5579) | YOLOv8n, Ultralytics 8.4.208, COCO 가중치, AGPL-3.0 | 클래스·신뢰도 필터, 촬영 차량 필터(대시보드와 반사), 차량당 박스 하나 |
+| 번호판 검출 (sangwon5579) | – | 후보 탐색: 수직 에지, 밝기, 적분 영상 기반 주변 대비, 박스 확장, NMS, 차량당 후보 4개 |
+| 크롭 전처리 (sangwon5579) | – | 그레이 변환, 쌍선형 리사이즈, 대비 스트레칭, 극성 맞춤, 기울기 보정, Otsu |
+| OCR (sangwon5579) | PaddleOCR 3.7.0, `korean` PP-OCRv5, Apache-2.0 | 줄 잇기, O/I 보정, 정규화. 미국 번호판은 번호 줄만 |
+| 상태 판정 (sangwon5579) | – | 한국·미국 번호판 형식에 따른 `readable` / `uncertain` / `unreadable` 규칙 |
+| 평가 (sangwon5579) | – | 짝짓기, 지표, 집계, 비교, 부호 검정, 환경 조건별 결과, 발표용 이미지 |
+| 장면 요약 (callmeaein) | VLM은 callmeaein이 채움(#38) | 프롬프트, 스키마, 주장 검사, 채점 |
+| 타임스탬프 고르기, 합성 안개 (sangwon5579, 도구만) | YOLOv8n 박스, YOLOv8n-seg 마스크 | 가까운 차량 규칙, Koschmieder 안개 모델, h1gyeon9의 Gaussian으로 산란 흐림, 센서 노이즈 |
 
 OpenCV는 이미지·영상 입출력에만 씁니다. `src/`에 OpenCV 처리 함수나 `_stub` 함수가 남아 있으면
 `python tools/check_forbidden.py src/`가 실패합니다.
@@ -158,7 +158,7 @@ python tools/check_forbidden.py src/
 ```
 
 테스트는 합성 프레임, 가짜 라벨, 모델 대역을 써서 데이터나 모델 다운로드가 필요 없습니다. 한국어 Windows에서는
-`-X utf8`이 필요합니다. B의 패키지 테스트 두 개가 기본 인코딩으로 텍스트를 읽기 때문입니다.
+`-X utf8`이 필요합니다. leojuho의 패키지 테스트 두 개가 기본 인코딩으로 텍스트를 읽기 때문입니다.
 
 ## 데이터 출처와 라이선스
 
