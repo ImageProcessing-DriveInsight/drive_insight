@@ -35,6 +35,8 @@ To evaluate together with own frames, give both label files:
 - Default: the image file name written in the label, with `.png` in place of its extension (`a.jpg` → `a.png`).
   A label with no file name uses its JSON file name.
 - When the evaluation frames get other names, pass a CSV with columns `source,frame` as `--names`.
+  `tools/eval_lists.py` builds `data/annotations/eval_names.csv` from the members' frame lists
+  ([#108](eval_lists.md)); labels of frames not in it, such as tuning frames, are skipped.
   `source` is the original image file name. Labels not in the CSV are skipped, so the CSV can also
   keep only the frozen evaluation list.
 - Two labels that map to the same frame name stop the run.

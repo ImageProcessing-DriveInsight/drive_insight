@@ -9,7 +9,7 @@ only the evaluation, aggregation and comparison per condition, without new OCR o
 
 ```
 python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json
-python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]
+python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs data/annotations/envs.csv]
 ```
 
 ## Output
@@ -24,7 +24,8 @@ python tools/env_report.py --scenes data/annotations/scenes.json data/annotation
 - `data/eval_set.csv`: `<clip name>_<timestamp_ms>.png` (B's frame names) takes the row's `condition`.
   The row's `clip` is used to split the VLM scores.
 - `--envs`: a CSV with columns `frame`, `env` (optional: `clip`), for frames named otherwise, such as AI Hub
-  frames without a timestamp. It wins over `eval_set.csv`.
+  frames without a timestamp. It wins over `eval_set.csv`. `tools/eval_lists.py` builds it from the
+  members' frame lists ([#108](eval_lists.md)).
 - A frame whose condition is unknown stops the run, so no frame drops out of every condition unseen.
 
 ## How it splits

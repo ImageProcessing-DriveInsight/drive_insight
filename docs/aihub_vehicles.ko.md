@@ -32,6 +32,8 @@ python -m src.eval.vehicles --frames <프레임 폴더> --scenes data/annotation
 
 - 기본: 라벨에 적힌 이미지 파일 이름의 확장자를 `.png`로 바꿉니다(`a.jpg` → `a.png`). 라벨에 파일 이름이 없으면 JSON 파일 이름을 씁니다.
 - 평가 프레임 이름을 따로 정하면 `source,frame` 열이 있는 CSV를 `--names`로 넘깁니다. `source`는 원본 이미지 파일 이름입니다.
+  팀원의 프레임 목록으로 `tools/eval_lists.py`가 `data/annotations/eval_names.csv`를 만듭니다([#108](eval_lists.ko.md)).
+  여기 없는 프레임(튜닝 프레임 등)의 라벨은 건너뜁니다.
   CSV에 없는 라벨은 건너뛰므로, 고정한 평가 목록만 남길 때도 씁니다.
 - 두 라벨이 같은 프레임 이름이 되면 멈춥니다.
 

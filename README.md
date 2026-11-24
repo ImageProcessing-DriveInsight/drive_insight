@@ -68,6 +68,7 @@ data/frames/orig/ fixed/ adaptive/ the same <clip>_<ms>.png in every condition f
 data/frames/clear/                 clear frames the synthetic fog was made from (sangwon5579's fog clips only)
 data/annotations/scenes.json       labels per frame: vehicles, plates, events (leojuho's label tool)
 data/annotations/aihub_vehicles.json  AI Hub vehicle labels converted for the vehicle rate (sangwon5579)
+data/annotations/envs.csv          condition of each image frame, e.g. AI Hub (sangwon5579)
 data/labels/plates.json            plate labels for the OCR evaluation (exported from scenes.json)
 data/plate_countries.json          frames with US plates, if any
 results/                           outputs, see below
@@ -86,11 +87,12 @@ The steps in order. Each owner runs their own step and hands over the files.
 | 1. Merge the members' lists | leojuho | `python -m tools.prepare_data member_a.csv member_b.csv member_c.csv member_d.csv` | `data/eval_set.csv` |
 | 2. Extract original frames | leojuho | `python -m tools.b_cli extract` | `data/frames/orig/` |
 | 3. Labels | leojuho, each owner | `python -m tools.b_labels init`, fill `scenes.json` (drafts: `python tools/label_draft.py draft`), then `python -m tools.b_labels export --require-review` | `data/annotations/scenes.json`, `data/labels/plates.json` |
-| 3a. AI Hub vehicle labels | sangwon5579 | `python tools/aihub_vehicles.py <label folders> [--names names.csv]` | `data/annotations/aihub_vehicles.json` |
+| 3a. Lists of image frames | sangwon5579 | `python tools/eval_lists.py --list <member's list> <condition> ...` | `data/annotations/envs.csv`, `eval_names.csv` |
+| 3b. AI Hub vehicle labels | sangwon5579 | `python tools/aihub_vehicles.py <label folders> --names data/annotations/eval_names.csv` | `data/annotations/aihub_vehicles.json` |
 | 4. Fixed enhancement | h1gyeon9 | `python -m src.dip.batch` | `data/frames/fixed/`, `results/params/fixed.json` |
 | 5. Adaptive enhancement | leojuho | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
 | 6. Plates, vehicles, evaluation, comparison | sangwon5579 | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
-| 7. Results per environment condition | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json [--envs envs.csv]` | `results/by_env/` |
+| 7. Results per environment condition | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json --envs data/annotations/envs.csv` | `results/by_env/` |
 | 8. Scene summaries and runner | callmeaein | pending (#38) | `results/vlm/score.csv`, `results/timing.csv` |
 | 9. Review package | leojuho | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
 
