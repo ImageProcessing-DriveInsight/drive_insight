@@ -12,6 +12,8 @@ from src.vlm.schema import validate_vlm_response
 logger = logging.getLogger(__name__)
 
 MODEL_NAME = "qwen3-vl:4b-instruct"
+# Used only on the retry after a reply hit the num_predict limit.
+RETRY_REPEAT_PENALTY = 1.3
 OLLAMA_URL = os.getenv(
     "OLLAMA_URL",
     "http://localhost:11434",
@@ -84,7 +86,19 @@ def analyze_frame(image_path, prompt=None, frame_number=1):
         },
     }
 
+    hit_token_limit = False
+
     for attempt in range(2):
+        if attempt == 1 and hit_token_limit:
+            # At temperature 0 a reply that loops on one word until
+            # num_predict loops the same way again; penalise repeats.
+            payload = {
+                **payload,
+                "options": {
+                    **payload["options"],
+                    "repeat_penalty": RETRY_REPEAT_PENALTY,
+                },
+            }
         if attempt == 1:
             payload["prompt"] += """
 Your previous response failed JSON/schema validation.
@@ -101,6 +115,7 @@ Return JSON only.
             )
             response.raise_for_status()
             response_data = response.json()
+            hit_token_limit = response_data.get("done_reason") == "length"
 
             result = json.loads(
                 response_data.get("response", "")
