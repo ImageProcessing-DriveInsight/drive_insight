@@ -13,7 +13,7 @@ from src.vlm.cache import (
 
 def test_get_cache_path():
     path = get_cache_path("orig", "clip01.jpg", root="tmp")
-    assert str(path) == "tmp/orig/clip01.json"
+    assert path.as_posix() == "tmp/orig/clip01.json"
 
 
 def test_rejects_invalid_condition():
