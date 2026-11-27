@@ -83,6 +83,52 @@ def test_retry_failure_raises_error(tmp_path, monkeypatch):
     print("PASS: Retry failure raises ValueError")
 
 
+def test_token_limit_retry_adds_repeat_penalty(tmp_path, monkeypatch):
+    image = tmp_path / "frame.png"
+    image.write_bytes(b"fake image data")
+
+    fake = FakeRequests([
+        FakeResponse({
+            "response": '{"vehicles": ["car", "car", "car", "ca',
+            "done_reason": "length",
+        }),
+        FakeResponse({
+            "response": json.dumps(VALID_RESPONSE),
+            "done_reason": "stop",
+        }),
+    ])
+    fake.RequestException = vlm_client.requests.RequestException
+
+    monkeypatch.setattr(vlm_client, "requests", fake)
+
+    assert vlm_client.analyze_frame(image) == VALID_RESPONSE
+
+    first, second = (call["json"]["options"] for call in fake.calls)
+    assert "repeat_penalty" not in first
+    assert second["repeat_penalty"] == vlm_client.RETRY_REPEAT_PENALTY
+    assert second["temperature"] == 0
+    assert second["num_predict"] == first["num_predict"]
+
+
+def test_schema_retry_keeps_options(tmp_path, monkeypatch):
+    image = tmp_path / "frame.png"
+    image.write_bytes(b"fake image data")
+
+    fake = FakeRequests([
+        FakeResponse({"response": '{"wrong_field": []}', "done_reason": "stop"}),
+        FakeResponse({"response": json.dumps(VALID_RESPONSE)}),
+    ])
+
+    monkeypatch.setattr(vlm_client, "requests", fake)
+
+    vlm_client.analyze_frame(image)
+
+    assert all(
+        "repeat_penalty" not in call["json"]["options"]
+        for call in fake.calls
+    )
+
+
 def test_missing_image_raises_error(tmp_path):
     image = tmp_path / "missing.png"
 
