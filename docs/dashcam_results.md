@@ -20,7 +20,7 @@ times are there.
 | Fixed | A's `python -m src.dip.batch`, default parameters |
 | Adaptive | B's `python -m tools.b_cli frames` with A's `apply_ops` |
 | Clear | the clear frames the fog was made from (`python -m src.plate.run clear`, #79) |
-| Labels | C, from zoomed crops: text spelled on the clear frame, status judged on the foggy frame (`readable` only if every character can be read there). 66 plates: 13 readable (10 different plates; one car is in 3 frames), 53 unreadable. Plates narrower than about 40 px and plates hidden behind other cars are not labeled. One plate whose Hangul could not be settled at its closest clear view is labeled unreadable. Vehicles: 222, drafted by YOLO on the clear frames and checked by eye; 9 duplicate boxes of vehicles seen as both car and truck were removed after the first run (#88). Not reviewed by D yet (ALL-03) |
+| Labels | C, from zoomed crops: text spelled on the clear frame, status judged on the foggy frame (`readable` only if every character can be read there). 66 plates: 13 readable (10 different plates; one car is in 3 frames), 53 unreadable. Plates narrower than about 40 px and plates hidden behind other cars are not labeled. One plate whose Hangul could not be settled at its closest clear view is labeled unreadable. Vehicles: 222, drafted by YOLO on the clear frames and checked by eye; 9 duplicate boxes of vehicles seen as both car and truck were removed after the first run (#88). Reviewed by D (ALL-03, 11/28): no problems found |
 
 ```bash
 python tools/plate_report.py    # OCR on every condition, evaluation, aggregation, comparison, slide images (#81), vehicle rate and comparison (#83, #86, #87)
@@ -133,7 +133,7 @@ loses more vehicles than it gains, also among the near ones.
   exact match. The numbers show directions, not small differences.
 - The fog is synthetic. A vehicle gets the fog of the distance where it meets the road, so near
   plates get little fog: at 10 m, `medium` keeps 0.77 and `heavy` 0.59 of the light.
-- One labeler (C); D's review (ALL-03) is still to come.
+- One labeler (C), reviewed by D (ALL-03), who found no problems.
 - The vehicle labels come from YOLO on the clear frames, so vehicles it missed there are not
   counted: the fog vehicle rates are relative to the clear frames, not to every vehicle on the road.
 - The fog clips were made before cars reflected on the dashboard were dropped from the vehicle

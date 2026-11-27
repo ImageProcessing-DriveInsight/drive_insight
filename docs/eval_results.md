@@ -181,7 +181,7 @@ there is no total time per frame.
 - Plate metrics cover fog only. Night and rain have vehicle labels but no plate text; backlight has
   neither.
 - The fog vehicle labels come from YOLO on the clear frames, so the fog rates are relative to those.
-  The night and rain labels are AI Hub's. C's fog labels are not yet reviewed by callmeaein (ALL-03).
+  The night and rain labels are AI Hub's. callmeaein reviewed C's fog labels (ALL-03) and found no problems.
 - The settings were fixed before this run. Do not tune them on these results.
 - The overall `summary.csv` pools the VLM counts of all environments, so use the numbers per
   environment (`results/by_env/`).
