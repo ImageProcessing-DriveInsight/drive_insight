@@ -195,10 +195,10 @@ Fog, night, rain and backlight, 150 frames in orig, fixed and adaptive ([details
   no plate text, so the plate metrics cover fog only; no night or rain plate was read.
 - VLM scene summaries (`qwen3-vl:4b-instruct`), hallucination rate in orig / fixed / adaptive: fog
   3.8 / 4.0 / 3.8 % (the same one claim in each), night 33 / 33 / 50 % and rain 17 / 17 / 17 % (6
-  checkable claims each), so no difference is meaningful. In rain the model often calls the scene foggy.
+  checkable claims each), backlight 20 / 21 / 20 % (the same 4 claims in each), so no difference is
+  meaningful. In rain the model often calls the scene foggy.
 
-The backlight VLM scores follow with callmeaein's scores. Tunnel is left out: no tunnel frames came
-before the deadline.
+Tunnel is left out: no tunnel frames came before the deadline.
 
 ## Pretrained models and own implementation
 
