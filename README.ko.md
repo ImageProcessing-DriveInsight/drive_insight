@@ -31,7 +31,7 @@ NumPy로 직접 구현했고, 사전학습 모델은 차량 검출, 글자 인�
 | [h1gyeon9](https://github.com/h1gyeon9) | `src/dip/` | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), `apply_ops`, `fixed_enhance`, 고정 보정 일괄 처리, 야간 데이터 점검과 프레임 목록 |
 | [leojuho](https://github.com/leojuho) | `src/io/`, `src/adaptive/`, `src/package/` | 프레임·영상 입출력, 화질 측정, 규칙 기반 파라미터, `adaptive_enhance`, 평가 목록과 라벨, 리뷰 패키지, 민감도 실험 |
 | [sangwon5579](https://github.com/sangwon5579) | `src/plate/`, `src/eval/` | 차량·번호판 검출, 크롭 전처리, OCR과 상태 판정, OCR 평가, 집계, 비교, 차량 검출률, 환경 조건별 결과 |
-| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, 프로젝트 파일, 제출. 아직 머지 전(#38) |
+| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, 프로젝트 파일, 제출 |
 
 인터페이스, 폴더, 일정은 [팀 계획](docs/plan/team_plan.ko.md)(팀원을 위 순서대로 A, B, C, D로 부름), 기능과 진행 상태는 [기능 명세](docs/plan/feature_spec.ko.md),
 전체 문서 목록은 [docs/](docs/README.ko.md)에 있습니다.
@@ -123,7 +123,7 @@ python tools/compare_images.py --hide 2                             # sangwon557
 
 ## 지금까지의 결과
 
-안개, 야간, 비 108장을 원본·고정·적응형 보정으로 돌린 결과입니다([자세히](docs/eval_results.ko.md)):
+안개, 야간, 비, 역광 150장을 원본·고정·적응형 보정으로 돌린 결과입니다([자세히](docs/eval_results.ko.md)):
 
 - 안개, 직접 찍은 블랙박스 클립에 합성 안개(클립 11개, 프레임 48장, 읽을 수 있는 라벨 번호판 13개, 라벨 차량 222대,
   [자세히](docs/dashcam_results.ko.md)):
@@ -134,10 +134,14 @@ python tools/compare_images.py --hide 2                             # sangwon557
 - 야간, AI Hub(프레임 30장, 그중 24장에 라벨 차량 114대): 차량 검출률은 원본과 고정 보정 0.25, 적응형 보정 0.22입니다.
   적응형 규칙은 모든 프레임에서 발동했습니다.
 - 비, AI Hub(프레임 30장, 라벨 차량 82대): 차량 검출률은 원본 0.10, 고정 보정 뒤 0.11, 적응형 보정 뒤 0.10입니다.
+- 역광, GLARE(클립 7개, 프레임 42장, 미국 번호판, 라벨 없음): 어느 조건에서도 번호판을 읽지 못했고, `readable`로 나온
+  결과는 블랙박스 날짜·시각 글자뿐이었습니다. 적응형 규칙은 5장, 모두 한 클립에서만 발동했습니다.
 - 야간과 비에서 보정이 바꾸는 차량은 1–4대이고, 의미 있는 차이는 없습니다. AI Hub에는 번호판 문자가 없어 번호판 지표는
   안개만 있고, 야간과 비에서는 번호판을 하나도 읽지 못했습니다.
+- VLM 장면 요약(`qwen3-vl:4b-instruct`)의 환각률은 원본 / 고정 / 적응형에서 야간 33 / 33 / 50 %, 비 17 / 17 / 17 %입니다.
+  확인할 수 있는 주장이 각각 6개라 의미 있는 차이는 없습니다. 비에서는 모델이 장면을 안개로 자주 봅니다.
 
-터널과 역광 결과는 프레임이 생기면, VLM 결과는 callmeaein의 점수가 오면 추가합니다.
+안개와 역광의 VLM 결과는 callmeaein의 점수가 오면, 터널 결과는 프레임이 생기면 추가합니다.
 
 ## 사전학습 모델과 직접 구현
 

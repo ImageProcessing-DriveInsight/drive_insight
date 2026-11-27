@@ -33,7 +33,7 @@ all conditions ──► evaluation, aggregation, comparison, per environment co
 | [h1gyeon9](https://github.com/h1gyeon9) | `src/dip/` | Color conversion, histogram equalization, gamma, Gaussian and median filters, unsharp masking (NumPy), `apply_ops`, `fixed_enhance`, fixed frame batches, night data checks and frame lists |
 | [leojuho](https://github.com/leojuho) | `src/io/`, `src/adaptive/`, `src/package/` | Frame and video I/O, quality measures, rule-based parameters, `adaptive_enhance`, evaluation set and labels, review packages, sensitivity runs |
 | [sangwon5579](https://github.com/sangwon5579) | `src/plate/`, `src/eval/` | Vehicle and plate detection, crop preprocessing, OCR and status, OCR evaluation, aggregation, comparison, vehicle detection rate, results per environment condition |
-| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | Experiment runner and timing, VLM summaries and scoring, project files, submission. Not merged yet (#38) |
+| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | Experiment runner and timing, VLM summaries and scoring, project files, submission |
 
 Interfaces, folders and the schedule are in the [team plan](docs/plan/team_plan.md), which calls the
 members A, B, C and D in the order above; features and their status are in the
@@ -128,7 +128,7 @@ plate texts or images of real plates and are ignored by git.
 
 ## Results so far
 
-Fog, night and rain, 108 frames in orig, fixed and adaptive ([details](docs/eval_results.md)):
+Fog, night, rain and backlight, 150 frames in orig, fixed and adaptive ([details](docs/eval_results.md)):
 
 - Fog, own dashcam clips with synthetic fog (11 clips, 48 frames, 13 readable labeled plates, 222 labeled
   vehicles; [details](docs/dashcam_results.md)):
@@ -140,10 +140,16 @@ Fog, night and rain, 108 frames in orig, fixed and adaptive ([details](docs/eval
   fixed, 0.22 in adaptive. Adaptive fired on every frame.
 - Rain, AI Hub (30 frames, 82 labeled vehicles): vehicle detection rate 0.10 in orig, 0.11 after fixed
   and 0.10 after adaptive.
+- Backlight, GLARE (7 clips, 42 frames, US plates, no labels): no plate was read in any condition; the
+  only `readable` results were the dashcam's date and time overlay. Adaptive fired on 5 frames, all in
+  one clip.
 - At night and in rain, enhancement changes 1–4 vehicles and no difference is significant. AI Hub has
   no plate text, so the plate metrics cover fog only; no night or rain plate was read.
+- VLM scene summaries (`qwen3-vl:4b-instruct`), hallucination rate in orig / fixed / adaptive: night
+  33 / 33 / 50 %, rain 17 / 17 / 17 %, from 6 checkable claims each, so no difference is meaningful. In
+  rain the model often calls the scene foggy.
 
-The tunnel and backlight results follow when their frames exist, the VLM results with callmeaein's scores.
+The fog and backlight VLM scores follow with callmeaein's scores, the tunnel results when its frames exist.
 
 ## Pretrained models and own implementation
 
