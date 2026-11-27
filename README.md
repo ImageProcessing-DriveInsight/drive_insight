@@ -33,7 +33,7 @@ all conditions ──► evaluation, aggregation, comparison, per environment co
 | [h1gyeon9](https://github.com/h1gyeon9) | `src/dip/` | Color conversion, histogram equalization, gamma, Gaussian and median filters, unsharp masking (NumPy), `apply_ops`, `fixed_enhance`, fixed frame batches, night data checks and frame lists |
 | [leojuho](https://github.com/leojuho) | `src/io/`, `src/adaptive/`, `src/package/` | Frame and video I/O, quality measures, rule-based parameters, `adaptive_enhance`, evaluation set and labels, review packages, sensitivity runs |
 | [sangwon5579](https://github.com/sangwon5579) | `src/plate/`, `src/eval/` | Vehicle and plate detection, crop preprocessing, OCR and status, OCR evaluation, aggregation, comparison, vehicle detection rate, results per environment condition |
-| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | Experiment runner and timing, VLM summaries and scoring, project files, submission |
+| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | Experiment runner and timing, VLM summaries and scoring, `main.py`, project files, submission (#38) |
 
 Interfaces, folders and the schedule are in the [team plan](docs/plan/team_plan.md), which calls the
 members A, B, C and D in the order above; features and their status are in the
@@ -46,8 +46,25 @@ Python 3.12 on Windows (the team's machines). Run every command from the reposit
 ```bat
 python -m venv .venv
 .venv\Scripts\activate
-python -m pip install -r requirements-plate.txt -r requirements-b.txt -r requirements-dip.txt
+python -m pip install -r requirements.txt
 ```
+
+`requirements.txt` holds the same pins as `requirements-plate.txt`, `requirements-b.txt` and
+`requirements-dip.txt` together, plus `requests` for the VLM client.
+
+**Visual Studio:** open `DriveInsight.sln`. The project uses the `.venv` made above and starts `main.py`,
+so F5 runs the whole experiment. Arguments go in Project → Properties → Debug → Script Arguments.
+
+**VLM (scene summaries):** install [Ollama](https://ollama.com) 0.12.7 or newer, then download the model once
+(about 3.3 GB) and keep Ollama running while the `vlm` step runs:
+
+```bat
+ollama pull qwen3-vl:4b-instruct
+```
+
+The model runs on the local PC, so no API key is needed or included. Another Ollama address can be set
+with the `OLLAMA_URL` environment variable (default `http://localhost:11434`). Without Ollama, use
+`--offline` (see [Run](#run)).
 
 - Use one fresh virtual environment. Do not add `requirements-video-io.txt` to it: it pins
   `opencv-python-headless`, and mixing OpenCV builds can break `cv2`.
@@ -55,6 +72,8 @@ python -m pip install -r requirements-plate.txt -r requirements-b.txt -r require
 - Model weights are downloaded on the first run: YOLO to `weights/` (ignored by git), PaddleOCR to
   `~/.paddlex/official_models/`.
 - On Windows, leojuho's notes use `py` in place of `python`; both work.
+- PaddleOCR installs `opencv-contrib-python` next to `opencv-python`, so `cv2` comes from the contrib
+  build. This is expected; all tests pass with it.
 
 ## Data
 
@@ -80,6 +99,31 @@ condition folders; that is how every condition is scored on the same frames.
 
 ## Run
 
+### One command
+
+```bat
+python main.py
+```
+
+`main.py` runs the three conditions with the steps `enhance`, `ocr` and `vlm`, then writes
+`results/summary.csv`. It first stops with an error if the three condition folders do not hold the same
+frame names. Existing outputs are never overwritten: OCR results, VLM files, filled sheets and packages are
+kept, and only the missing ones are made.
+
+| Command | What it does |
+| --- | --- |
+| `python main.py --condition fixed --steps vlm` | one condition, one step (repeat `--condition` for more) |
+| `python main.py --clip <clip> --clip <clip>` | the VLM step on these clips only |
+| `python main.py --offline` | never calls the VLM: reuses `results/vlm/<cond>/<clip>.json` and lists clips with no cached file |
+| `python main.py --no-run --make-sheets` | blinded fact-check sheets `results/vlm/verify/s001.csv`, … with no condition names; the key is `results/vlm/verify_key.csv` |
+| `python main.py --no-run --score` | scores every filled sheet (`label` = `correct`, `unsupported` or `uncheckable`) into `results/vlm/score.csv` |
+| `python main.py --no-run --package <clip>` | review package `package/<clip>/summary.html` |
+
+The enhancement step reuses the frames in `data/frames/fixed/` and `data/frames/adaptive/` (steps 4 and 5
+below); it does not make them again. Give the fact checkers only the `verify/` folder, not the key.
+
+### Steps by owner
+
 The steps in order. Each owner runs their own step and hands over the files.
 
 | Step | Owner | Command | Output |
@@ -93,7 +137,7 @@ The steps in order. Each owner runs their own step and hands over the files.
 | 5. Adaptive enhancement | leojuho | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
 | 6. Plates, vehicles, evaluation, comparison | sangwon5579 | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
 | 7. Results per environment condition | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json --envs data/annotations/envs.csv` | `results/by_env/` |
-| 8. Scene summaries and runner | callmeaein | pending (#38) | `results/vlm/score.csv`, `results/timing.csv` |
+| 8. Scene summaries, fact check, scores | callmeaein | `python main.py --steps vlm`, then `--no-run --make-sheets`, fill the sheets, `--no-run --score` | `results/vlm/<cond>/<clip>.json`, `results/<cond>/timing.csv`, `results/<cond>/config_snapshot.json`, `results/vlm/score.csv` |
 | 9. Review package | leojuho | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
 
 More tools:
@@ -117,6 +161,10 @@ python tools/compare_images.py --hide 2                             # sangwon557
 | `results/ocr/<cond>.csv` | one row per plate: box, crop, text, confidence, status (`readable`, `uncertain`, `unreadable`), OCR time |
 | `results/ocr/ocr_summary.csv` | detection rate, exact match, character accuracy, readable but wrong, unreadable but answered readable |
 | `results/summary.csv` | OCR metrics, VLM scores and step times per condition |
+| `results/vlm/<cond>/<clip>.json` | VLM scene summary per clip: `vehicles`, `events` (order, content, frame), `visibility_notes`, `uncertain` |
+| `results/vlm/score.csv` | one row per condition and clip: facts, correct facts, checkable, unsupported and uncheckable claims, scene accuracy, hallucination rate |
+| `results/<cond>/timing.csv` | time per frame and step (`enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms`) |
+| `results/<cond>/config_snapshot.json` | steps, model versions and the SHA-256 hash of the VLM prompt of the last run |
 | `results/compare.csv`, `worse_cases.csv` | frames that got better or worse from `orig` to `fixed` and `fixed` to `adaptive`, with a sign test; plates that got worse |
 | `results/vehicles.csv`, `vehicle_compare.csv` | vehicle detection rate by vehicle size; vehicles found or lost between conditions |
 | `results/by_env/` | the same tables per environment condition (fog, low light, rain, tunnel, backlight) |
@@ -164,7 +212,7 @@ The fog and backlight VLM scores follow with callmeaein's scores, the tunnel res
 | OCR (sangwon5579) | PaddleOCR 3.7.0, `korean` PP-OCRv5, Apache-2.0 | Line joining, O/I fixes, normalization; US plates: number line only |
 | Plate status (sangwon5579) | – | `readable` / `uncertain` / `unreadable` rules on the Korean and US plate formats |
 | Evaluation (sangwon5579) | – | Matching, metrics, aggregation, comparison, sign test, results per condition, slide images |
-| Scene summaries (callmeaein) | VLM to be filled in by callmeaein (#38) | Prompt, schema, claim checks, scoring |
+| Scene summaries (callmeaein) | Qwen3-VL 4B Instruct (`qwen3-vl:4b-instruct`) on local Ollama, temperature 0, Apache-2.0 | Prompt, JSON schema check with one retry, merge per clip, cache, blinded claim sheets, scoring |
 | Timestamp picking, synthetic fog (sangwon5579, tools only) | YOLOv8n boxes, YOLOv8n-seg masks | Near-vehicle rules; Koschmieder fog model, scattering blur with h1gyeon9's Gaussian, sensor noise |
 
 OpenCV is used only for image and video input and output. `python tools/check_forbidden.py src/`
@@ -176,6 +224,9 @@ fails if an OpenCV processing function or a `_stub` function is left in `src/`.
 python -X utf8 -m pytest -q
 python tools/check_forbidden.py src/
 ```
+
+In a fresh environment: 736 passed, 3 skipped (YOLO weights not downloaded yet, Korean and Arial fonts
+missing on non-Windows machines).
 
 The tests use synthetic frames, synthetic labels and model stand-ins, so they need no data or model
 download. On a Korean Windows locale, `-X utf8` is needed: two of leojuho's package tests read text with the

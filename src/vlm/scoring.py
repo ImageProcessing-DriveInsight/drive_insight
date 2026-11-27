@@ -89,12 +89,26 @@ def score_vlm(
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
+    # One row per condition and clip: replace this pair's old row, keep the rest.
+    kept = []
+    if output.exists():
+        with open(output, "r", newline="", encoding="utf-8") as file:
+            kept = [
+                row for row in csv.DictReader(file)
+                if (row.get("condition"), row.get("clip")) != (condition, clip)
+            ]
+
+    new_row = {
+        key: "" if result[key] is None else result[key]
+        for key in SCORE_COLUMNS
+    }
+
     with open(output, "w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=SCORE_COLUMNS)
+        writer = csv.DictWriter(
+            file, fieldnames=SCORE_COLUMNS, extrasaction="ignore"
+        )
         writer.writeheader()
-        writer.writerow({
-            key: result[key]
-            for key in SCORE_COLUMNS
-        })
+        writer.writerows(kept)
+        writer.writerow(new_row)
 
     return result

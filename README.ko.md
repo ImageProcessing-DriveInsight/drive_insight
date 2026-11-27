@@ -31,7 +31,7 @@ NumPy로 직접 구현했고, 사전학습 모델은 차량 검출, 글자 인�
 | [h1gyeon9](https://github.com/h1gyeon9) | `src/dip/` | 색 공간 변환, 히스토그램 평활화, 감마, Gaussian·Median 필터, Unsharp masking(NumPy), `apply_ops`, `fixed_enhance`, 고정 보정 일괄 처리, 야간 데이터 점검과 프레임 목록 |
 | [leojuho](https://github.com/leojuho) | `src/io/`, `src/adaptive/`, `src/package/` | 프레임·영상 입출력, 화질 측정, 규칙 기반 파라미터, `adaptive_enhance`, 평가 목록과 라벨, 리뷰 패키지, 민감도 실험 |
 | [sangwon5579](https://github.com/sangwon5579) | `src/plate/`, `src/eval/` | 차량·번호판 검출, 크롭 전처리, OCR과 상태 판정, OCR 평가, 집계, 비교, 차량 검출률, 환경 조건별 결과 |
-| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, 프로젝트 파일, 제출 |
+| [callmeaein](https://github.com/callmeaein) | `src/common/`, `src/pipeline/`, `src/vlm/` | 실험 실행기와 시간 측정, VLM 요약과 채점, `main.py`, 프로젝트 파일, 제출(#38) |
 
 인터페이스, 폴더, 일정은 [팀 계획](docs/plan/team_plan.ko.md)(팀원을 위 순서대로 A, B, C, D로 부름), 기능과 진행 상태는 [기능 명세](docs/plan/feature_spec.ko.md),
 전체 문서 목록은 [docs/](docs/README.ko.md)에 있습니다.
@@ -43,14 +43,32 @@ Windows의 Python 3.12(팀원 PC)에서 씁니다. 모든 명령은 저장소 �
 ```bat
 python -m venv .venv
 .venv\Scripts\activate
-python -m pip install -r requirements-plate.txt -r requirements-b.txt -r requirements-dip.txt
+python -m pip install -r requirements.txt
 ```
+
+`requirements.txt`에는 `requirements-plate.txt`, `requirements-b.txt`, `requirements-dip.txt`의 버전이 모두 들어 있고,
+VLM 클라이언트용 `requests`가 더해져 있습니다.
+
+**Visual Studio:** `DriveInsight.sln`을 엽니다. 위에서 만든 `.venv`를 쓰고 `main.py`로 시작하므로 F5로 전체 실험이
+돌아갑니다. 인자는 프로젝트 → 속성 → 디버그 → 스크립트 인수에 넣습니다.
+
+**VLM(장면 요약):** [Ollama](https://ollama.com) 0.12.7 이상을 설치하고 모델을 한 번 받습니다(약 3.3 GB). `vlm` 단계가
+도는 동안 Ollama를 켜 둡니다.
+
+```bat
+ollama pull qwen3-vl:4b-instruct
+```
+
+모델이 PC에서 직접 돌기 때문에 API 키가 필요 없고 포함되어 있지도 않습니다. 다른 Ollama 주소는 환경 변수
+`OLLAMA_URL`로 바꿉니다(기본값 `http://localhost:11434`). Ollama가 없으면 `--offline`을 씁니다([실행](#실행) 참고).
 
 - 새 가상환경 하나에 설치합니다. `requirements-video-io.txt`는 같이 설치하지 않습니다. `opencv-python-headless`를
   고정하는데, OpenCV 배포판이 섞이면 `cv2`가 깨질 수 있습니다.
 - `requirements-plate.txt`의 `pandas`, `chardet` 버전은 최신 빌드가 막힌 팀원 PC 한 대 때문에 고정한 것입니다.
 - 모델 가중치는 처음 실행할 때 받아집니다. YOLO는 `weights/`(git 제외), PaddleOCR은 `~/.paddlex/official_models/`입니다.
 - leojuho의 문서는 Windows에서 `python` 대신 `py`를 씁니다. 둘 다 됩니다.
+- PaddleOCR이 `opencv-python` 옆에 `opencv-contrib-python`을 설치하므로 `cv2`는 contrib 빌드에서 옵니다.
+  정상이며, 이 상태로 모든 테스트가 통과합니다.
 
 ## 데이터
 
@@ -75,6 +93,30 @@ package/<clip>/                    리뷰 패키지
 
 ## 실행
 
+### 한 번에 실행
+
+```bat
+python main.py
+```
+
+`main.py`는 세 조건을 `enhance`, `ocr`, `vlm` 단계로 돌리고 `results/summary.csv`를 만듭니다. 세 조건 폴더의 프레임
+이름이 다르면 먼저 오류로 멈춥니다. 이미 있는 결과는 덮어쓰지 않습니다. OCR 결과, VLM 파일, 채운 시트, 패키지는 그대로
+두고 없는 것만 만듭니다.
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `python main.py --condition fixed --steps vlm` | 한 조건, 한 단계 (`--condition`을 반복하면 여러 조건) |
+| `python main.py --clip <클립> --clip <클립>` | 이 클립들만 VLM 단계 실행 |
+| `python main.py --offline` | VLM을 호출하지 않음. `results/vlm/<cond>/<clip>.json`을 다시 쓰고, 저장된 파일이 없는 클립을 알려 줌 |
+| `python main.py --no-run --make-sheets` | 조건 이름을 가린 사실 확인 시트 `results/vlm/verify/s001.csv`, … 대응표는 `results/vlm/verify_key.csv` |
+| `python main.py --no-run --score` | 다 채운 시트(`label` = `correct`, `unsupported`, `uncheckable`)를 채점해 `results/vlm/score.csv`에 저장 |
+| `python main.py --no-run --package <클립>` | 리뷰 패키지 `package/<클립>/summary.html` |
+
+보정 단계는 `data/frames/fixed/`, `data/frames/adaptive/`의 프레임(아래 4, 5단계)을 그대로 씁니다. 다시 만들지 않습니다.
+사실 확인 담당에게는 대응표 없이 `verify/` 폴더만 줍니다.
+
+### 담당별 단계
+
 순서대로 진행합니다. 각 담당이 자기 단계를 돌리고 결과 파일을 넘깁니다.
 
 | 단계 | 담당 | 명령 | 출력 |
@@ -88,7 +130,7 @@ package/<clip>/                    리뷰 패키지
 | 5. 적응형 보정 | leojuho | `python -m tools.b_cli frames --apply-ops src.dip.fixed:apply_ops` | `data/frames/adaptive/`, `results/params/adaptive.json` |
 | 6. 번호판, 차량, 평가, 비교 | sangwon5579 | `python tools/plate_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json` | `results/` |
 | 7. 환경 조건별 결과 | sangwon5579 | `python tools/env_report.py --scenes data/annotations/scenes.json data/annotations/aihub_vehicles.json --envs data/annotations/envs.csv` | `results/by_env/` |
-| 8. 장면 요약과 실행기 | callmeaein | 진행 중(#38) | `results/vlm/score.csv`, `results/timing.csv` |
+| 8. 장면 요약, 사실 확인, 채점 | callmeaein | `python main.py --steps vlm`, 그다음 `--no-run --make-sheets`, 시트 채우기, `--no-run --score` | `results/vlm/<cond>/<clip>.json`, `results/<cond>/timing.csv`, `results/<cond>/config_snapshot.json`, `results/vlm/score.csv` |
 | 9. 리뷰 패키지 | leojuho | `python -m tools.b_cli package <clip>` | `package/<clip>/summary.html` |
 
 그 밖의 도구:
@@ -112,6 +154,10 @@ python tools/compare_images.py --hide 2                             # sangwon557
 | `results/ocr/<cond>.csv` | 번호판마다 한 행: 박스, 크롭, 글자, 신뢰도, 상태(`readable`, `uncertain`, `unreadable`), OCR 시간 |
 | `results/ocr/ocr_summary.csv` | 검출률, 완전 일치율, 문자 정확도, 틀렸는데 readable로 낸 수, 못 읽는 번호판을 readable로 낸 수 |
 | `results/summary.csv` | 조건별 OCR 지표, VLM 점수, 단계별 시간 |
+| `results/vlm/<cond>/<clip>.json` | 클립별 VLM 장면 요약: `vehicles`, `events`(order, content, frame), `visibility_notes`, `uncertain` |
+| `results/vlm/score.csv` | 조건·클립마다 한 행: 사실 수, 맞힌 사실, 확인 가능·근거 없음·확인 불가 주장 수, 장면 정확도, 환각률 |
+| `results/<cond>/timing.csv` | 프레임·단계별 시간(`enhance_ms`, `ocr_ms`, `vlm_ms`, `total_ms`) |
+| `results/<cond>/config_snapshot.json` | 마지막 실행의 단계, 모델 버전, VLM 프롬프트의 SHA-256 해시 |
 | `results/compare.csv`, `worse_cases.csv` | `orig` → `fixed`, `fixed` → `adaptive`에서 좋아지거나 나빠진 프레임과 부호 검정, 나빠진 번호판 |
 | `results/vehicles.csv`, `vehicle_compare.csv` | 차량 크기별 검출률, 조건 사이에 새로 찾거나 놓친 차량 |
 | `results/by_env/` | 같은 표를 환경 조건(안개, 야간, 비, 터널, 역광)별로 |
@@ -156,7 +202,7 @@ python tools/compare_images.py --hide 2                             # sangwon557
 | OCR (sangwon5579) | PaddleOCR 3.7.0, `korean` PP-OCRv5, Apache-2.0 | 줄 잇기, O/I 보정, 정규화. 미국 번호판은 번호 줄만 |
 | 상태 판정 (sangwon5579) | – | 한국·미국 번호판 형식에 따른 `readable` / `uncertain` / `unreadable` 규칙 |
 | 평가 (sangwon5579) | – | 짝짓기, 지표, 집계, 비교, 부호 검정, 환경 조건별 결과, 발표용 이미지 |
-| 장면 요약 (callmeaein) | VLM은 callmeaein이 채움(#38) | 프롬프트, 스키마, 주장 검사, 채점 |
+| 장면 요약 (callmeaein) | Qwen3-VL 4B Instruct(`qwen3-vl:4b-instruct`), 로컬 Ollama, temperature 0, Apache-2.0 | 프롬프트, JSON 스키마 검사와 1회 재시도, 클립 단위 병합, 캐시, 조건을 가린 주장 시트, 채점 |
 | 타임스탬프 고르기, 합성 안개 (sangwon5579, 도구만) | YOLOv8n 박스, YOLOv8n-seg 마스크 | 가까운 차량 규칙, Koschmieder 안개 모델, h1gyeon9의 Gaussian으로 산란 흐림, 센서 노이즈 |
 
 OpenCV는 이미지·영상 입출력에만 씁니다. `src/`에 OpenCV 처리 함수나 `_stub` 함수가 남아 있으면
@@ -168,6 +214,8 @@ OpenCV는 이미지·영상 입출력에만 씁니다. `src/`에 OpenCV 처리 �
 python -X utf8 -m pytest -q
 python tools/check_forbidden.py src/
 ```
+
+새 환경에서 736개 통과, 3개 건너뜀(YOLO 가중치를 아직 받지 않음, Windows가 아닌 PC에 한글·Arial 글꼴 없음).
 
 테스트는 합성 프레임, 가짜 라벨, 모델 대역을 써서 데이터나 모델 다운로드가 필요 없습니다. 한국어 Windows에서는
 `-X utf8`이 필요합니다. leojuho의 패키지 테스트 두 개가 기본 인코딩으로 텍스트를 읽기 때문입니다.

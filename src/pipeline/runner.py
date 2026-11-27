@@ -17,14 +17,27 @@ logger = get_logger(__name__)
 VALID_CONDITIONS = {"orig", "fixed", "adaptive"}
 VALID_STEPS = {"enhance", "ocr", "vlm"}
 
-# Temporary values until the team selects the actual models and prompt.
+# Models used by each step (see the README table of pretrained models).
 MODEL_VERSIONS = {
-    "enhancement": "not_configured",
-    "ocr": "not_configured",
-    "vlm": "not_configured",
+    "enhancement": "own NumPy implementation (src.dip, src.adaptive)",
+    "vehicle_detection": "YOLOv8n, ultralytics 8.4.208, COCO weights",
+    "ocr": "PaddleOCR 3.7.0, korean PP-OCRv5",
+    "vlm": "ollama qwen3-vl:4b-instruct",
 }
 
-PROMPT_VERSION = "DriveInsight VLM prompt not configured yet"
+
+def _vlm_model_and_prompt():
+    """Return the VLM model name and the prompt the client really sends."""
+    from src.vlm.client import MODEL_NAME, SYSTEM_PROMPT
+
+    return MODEL_NAME, SYSTEM_PROMPT
+
+
+def _frame_sort_key(path):
+    """Sort <clip>_<number>.png by the number, so _500 comes before _3500."""
+    match = re.search(r"_(\d+)$", path.stem)
+    number = int(match.group(1)) if match else -1
+    return (re.sub(r"_\d+$", "", path.stem), number, path.name)
 
 
 def _group_frames_by_clip(frames_dir):
@@ -39,6 +52,9 @@ def _group_frames_by_clip(frames_dir):
     for path in files:
         clip_id = re.sub(r"_\d+$", "", path.stem)
         groups.setdefault(clip_id, []).append(path)
+
+    for paths in groups.values():
+        paths.sort(key=_frame_sort_key)
 
     return groups
 
@@ -206,16 +222,18 @@ def run_experiment(condition, steps=None, frame_lists=None):
     result_dir = project_root / "results" / condition
     result_dir.mkdir(parents=True, exist_ok=True)
 
-    # Calculate the prompt hash.
-    prompt_hash = hashlib.sha256(
-        PROMPT_VERSION.encode("utf-8")
-    ).hexdigest()
+    # Hash the prompt the VLM client really sends.
+    vlm_model, prompt = _vlm_model_and_prompt()
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+    model_versions = dict(MODEL_VERSIONS)
+    model_versions["vlm"] = f"ollama {vlm_model}"
 
     # Save the experiment configuration.
     config = {
         "condition": condition,
         "steps": steps,
-        "model_versions": MODEL_VERSIONS,
+        "model_versions": model_versions,
         "prompt_hash": prompt_hash,
     }
 
@@ -234,6 +252,16 @@ def run_experiment(condition, steps=None, frame_lists=None):
     }
 
 
+TIMING_COLUMNS = [
+    "frame",
+    "condition",
+    "enhance_ms",
+    "ocr_ms",
+    "vlm_ms",
+    "total_ms",
+]
+
+
 def save_timing_csv(result_dir, timing_rows, *, overwrite=False):
     """Save timing.csv without overwriting unless explicitly requested."""
 
@@ -242,14 +270,7 @@ def save_timing_csv(result_dir, timing_rows, *, overwrite=False):
     result_dir.mkdir(parents=True, exist_ok=True)
     mode = "w" if overwrite else "x"
 
-    fieldnames = [
-        "frame",
-        "condition",
-        "enhance_ms",
-        "ocr_ms",
-        "vlm_ms",
-        "total_ms",
-    ]
+    fieldnames = TIMING_COLUMNS
 
     with open(timing_path, mode, newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -260,6 +281,31 @@ def save_timing_csv(result_dir, timing_rows, *, overwrite=False):
 
     return timing_path
 
+
+def add_timing_rows(result_dir, timing_rows):
+    """Add new frames to timing.csv and keep every row already in it.
+
+    A frame already in the file keeps its old row, so no frame is counted twice.
+    Returns (path, number of rows added).
+    """
+    timing_path = Path(result_dir) / "timing.csv"
+
+    if not timing_path.exists():
+        save_timing_csv(result_dir, timing_rows)
+        return timing_path, len(timing_rows)
+
+    with timing_path.open("r", newline="", encoding="utf-8") as file:
+        existing = list(csv.DictReader(file))
+
+    known = {row["frame"] for row in existing}
+    new_rows = [row for row in timing_rows if row["frame"] not in known]
+
+    if new_rows:
+        save_timing_csv(result_dir, existing + new_rows, overwrite=True)
+
+    return timing_path, len(new_rows)
+
+
 def execute_experiment(
     condition,
     steps=None,
@@ -267,8 +313,14 @@ def execute_experiment(
     clip_ids=None,
     frames_dir=None,
     results_dir=None,
+    offline=False,
 ):
-    """Execute selected experiment steps without overwriting existing outputs."""
+    """Execute selected experiment steps without overwriting existing outputs.
+
+    With offline=True the VLM is never called: clips with a cached
+    results/vlm/<condition>/<clip>.json are reused and the others are listed
+    in result["missing_clips"].
+    """
 
     if condition not in VALID_CONDITIONS:
         raise ValueError(f"Invalid condition: {condition}")
@@ -302,6 +354,7 @@ def execute_experiment(
         "vlm": "not_requested",
         "processed_clips": [],
         "skipped_clips": [],
+        "missing_clips": [],
     }
 
     timing_rows = []
@@ -347,6 +400,10 @@ def execute_experiment(
                 result["skipped_clips"].append(clip_id)
                 continue
 
+            if offline:
+                result["missing_clips"].append(clip_id)
+                continue
+
             responses = []
 
             for frame_number, frame_path in enumerate(paths, start=1):
@@ -373,17 +430,16 @@ def execute_experiment(
             _save_json_new(output_path, summary)
             result["processed_clips"].append(clip_id)
 
-        result["vlm"] = "completed"
+        if offline and result["missing_clips"]:
+            result["vlm"] = "offline_cache_incomplete"
+        elif offline:
+            result["vlm"] = "offline_cache"
+        else:
+            result["vlm"] = "completed"
 
     if timing_rows:
-        timing_dir = results_dir / condition
-        timing_path = timing_dir / "timing.csv"
-
-        if timing_path.exists():
-            result["timing"] = "skipped_existing_file"
-        else:
-            save_timing_csv(timing_dir, timing_rows)
-            result["timing"] = "saved"
+        _, added = add_timing_rows(results_dir / condition, timing_rows)
+        result["timing"] = f"saved_{added}_rows"
     else:
         result["timing"] = "no_new_vlm_timings"
 
