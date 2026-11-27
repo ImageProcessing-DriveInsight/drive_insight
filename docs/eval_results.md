@@ -1,11 +1,11 @@
-# Results on the Evaluation Frames (#116, #118)
+# Results on the Evaluation Frames (#116, #118, #121)
 
 [한국어](eval_results.ko.md)
 
 Every evaluation frame received by 11/27: fog 48, night 30 and rain 30 (run on 11/24), and backlight 42
 (added on 11/26), each in orig, fixed and adaptive. Only numbers are here. Frames, labels, crops, plate
-texts and slide images stay outside git. The night and rain VLM scores are in; the fog and backlight
-VLM scores and the tunnel frames are still to come.
+texts and slide images stay outside git. The fog, night and rain VLM scores are in; the backlight VLM
+scores are still to come. Tunnel is left out: no tunnel frames came before the deadline.
 
 ## Setup
 
@@ -19,7 +19,7 @@ VLM scores and the tunnel frames are still to come.
 | Adaptive | leojuho's rules on `develop` (`src/adaptive/`) with `apply_ops` |
 | Plate labels | Fog only: 13 readable plates (C's labels). AI Hub has no plate text and backlight has no plate labels, so the plate metrics cover fog only |
 | Vehicle labels | Fog: 222 (C's). Night and rain: AI Hub boxes converted by `tools/aihub_vehicles.py` ([#90](aihub_vehicles.md)). Night: 114 vehicles in 24 frames; the 6 frames with group labels are left out. Rain: 82 vehicles in 30 frames. Backlight: none |
-| VLM | callmeaein's runs: `qwen3-vl:4b-instruct` on Ollama, one request per frame, claims merged per clip. The claims were checked by eye against the frames, then scored by callmeaein |
+| VLM | callmeaein's runs: `qwen3-vl:4b-instruct` on Ollama, one request per frame, claims merged per clip. The claims were checked by eye against the frames (fog by leojuho), then scored by callmeaein |
 | Times | Fixed and adaptive rerun for all 108 fog, night and rain frames on one PC (C's). The rerun frames are byte-identical to the ones evaluated, so only the times changed. The backlight fixed and adaptive frames were made on the same PC |
 
 ```bash
@@ -43,6 +43,8 @@ clips as `us`.
   the clips is not pixel-identical (mean difference 0.5–1.7 levels, a decoder difference), so fixed and
   adaptive were made from the PNGs, not from new frames.
 - Adding backlight left every fog, night and rain number unchanged.
+- Fog VLM: callmeaein's fog scores match leojuho's filled sheet (each image's counts equal one clip's
+  row). Adding them left the night and rain scores and every OCR and vehicle number unchanged.
 
 ## Plates
 
@@ -92,7 +94,7 @@ Vehicle by vehicle (`vehicle_compare.csv`), gained / lost (sign test p):
 
 Boxes that match no labeled vehicle: night 1 in each condition, rain none.
 
-## VLM scene summaries (night, rain)
+## VLM scene summaries (fog, night, rain)
 
 Only vehicle and event claims can be checked against a frame. Weather and visibility claims count as
 uncheckable and stay out of the score. The hallucination rate is unsupported / checkable claims. In
@@ -101,10 +103,15 @@ and only the rate is shown.
 
 | | checkable claims | orig | fixed | adaptive |
 | --- | --- | --- | --- | --- |
+| Fog | 26 / 25 / 26 | 3.8 % (1) | 4.0 % (1) | 3.8 % (1) |
 | Night | 6 per condition | 33 % (2) | 33 % (2) | 50 % (3) |
 | Rain | 6 per condition | 17 % (1) | 17 % (1) | 17 % (1) |
 
-Uncheckable claims: night 4 / 2 / 1, rain 14 / 12 / 18 (orig / fixed / adaptive).
+Uncheckable claims: fog 17 / 15 / 17, night 4 / 2 / 1, rain 14 / 12 / 18 (orig / fixed / adaptive).
+
+In fog, the one unsupported claim in each condition is a truck in `fog_05`, whose frames show a bus and
+cars only. The reviewer marked 3 vehicle claims uncheckable because the vehicle could be a van or an
+SUV; they count as uncheckable.
 
 In rain, the VLM made 29 fog claims such as "heavy fog" in 12 of the 15 sheets (5 runs × 3
 conditions). They are weather claims, so they are not scored, but the model takes rain for fog.
@@ -151,21 +158,22 @@ on different PCs, so there is no total time per frame.
 5. **No plate is read at night, in rain or in backlight** in any condition. In backlight, the only
    `readable` results were the dashcam's date and time overlay.
 6. **Adaptive rarely changes backlight frames.** It fires on 5 of 42, all in one clip.
-7. **The VLM scores do not separate the conditions.** At night the hallucination rate is 33 % in orig
-   and fixed and 50 % in adaptive; in rain it is 17 % in all three. With 6 checkable claims, one claim
-   moves the rate by 17 points.
+7. **The VLM scores do not separate the conditions.** In fog the hallucination rate is about 4 % in all
+   three, from the same one claim. At night it is 33 % in orig and fixed and 50 % in adaptive; in rain
+   it is 17 % in all three. With 6 checkable claims at night and in rain, one claim moves the rate by
+   17 points.
 
 ## Caveats
 
 - Small samples: 13 readable fog plates, night and rain differences of 1–4 vehicles, and 6 checkable
-  VLM claims per environment and condition.
+  VLM claims per condition at night and in rain (25–26 in fog).
 - Plate metrics cover fog only. Night and rain have vehicle labels but no plate text; backlight has
   neither.
 - The fog vehicle labels come from YOLO on the clear frames, so the fog rates are relative to those.
   The night and rain labels are AI Hub's. C's fog labels are not yet reviewed by callmeaein (ALL-03).
 - The settings were fixed before this run. Do not tune them on these results.
-- The VLM scores cover night and rain. Until every clip is scored, the overall `summary.csv` averages
-  the VLM rates per clip, so use the numbers per environment (`results/by_env/`). When the fog and
+- The VLM scores cover fog, night and rain; backlight follows. The overall `summary.csv` pools the VLM
+  counts of all environments, so use the numbers per environment (`results/by_env/`). When the
   backlight scores arrive, `plate_report.py --skip-ocr` and `env_report.py` rerun without new OCR.
-  Tunnel is added once its frames exist.
+- Tunnel is left out: no tunnel frames came before the deadline (11/28).
 - Times are from one run on each PC, not a benchmark.
