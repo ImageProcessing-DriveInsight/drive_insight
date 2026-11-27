@@ -193,11 +193,12 @@ Fog, night, rain and backlight, 150 frames in orig, fixed and adaptive ([details
   one clip.
 - At night and in rain, enhancement changes 1–4 vehicles and no difference is significant. AI Hub has
   no plate text, so the plate metrics cover fog only; no night or rain plate was read.
-- VLM scene summaries (`qwen3-vl:4b-instruct`), hallucination rate in orig / fixed / adaptive: night
-  33 / 33 / 50 %, rain 17 / 17 / 17 %, from 6 checkable claims each, so no difference is meaningful. In
-  rain the model often calls the scene foggy.
+- VLM scene summaries (`qwen3-vl:4b-instruct`), hallucination rate in orig / fixed / adaptive: fog
+  3.8 / 4.0 / 3.8 % (the same one claim in each), night 33 / 33 / 50 % and rain 17 / 17 / 17 % (6
+  checkable claims each), so no difference is meaningful. In rain the model often calls the scene foggy.
 
-The fog and backlight VLM scores follow with callmeaein's scores, the tunnel results when its frames exist.
+The backlight VLM scores follow with callmeaein's scores. Tunnel is left out: no tunnel frames came
+before the deadline.
 
 ## Pretrained models and own implementation
 
